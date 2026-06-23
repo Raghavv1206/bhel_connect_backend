@@ -83,6 +83,7 @@ ASGI_APPLICATION = 'bhel_connect_backend.asgi.application'
 
 
 import sys
+import urllib.parse as urlparse
 
 # Database Configuration
 # Primary: PostgreSQL (with SQLite fallback for local development)
@@ -98,6 +99,20 @@ DATABASES = {
     }
 }
 
+# Support DATABASE_URL from Render or other hosting providers
+db_url = os.environ.get('DATABASE_URL')
+if db_url:
+    url = urlparse.urlparse(db_url)
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': url.path[1:],
+        'USER': url.username,
+        'PASSWORD': url.password,
+        'HOST': url.hostname,
+        'PORT': url.port or '5432',
+        'CONN_MAX_AGE': 0 if 'test' in sys.argv else 600,
+    }
+
 # Fallback database if we are running in debug mode and postgres is not configured or uses default placeholders
 db_pass = os.environ.get('DB_PASSWORD', '')
 if 'test' in sys.argv:
@@ -105,7 +120,7 @@ if 'test' in sys.argv:
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': str(BASE_DIR / 'db_test.sqlite3'),
     }
-elif DEBUG and (not db_pass or db_pass == 'your_db_password' or db_pass == 'your_db_password_here'):
+elif not db_url and DEBUG and (not db_pass or db_pass == 'your_db_password' or db_pass == 'your_db_password_here'):
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': str(BASE_DIR / 'db.sqlite3'),
