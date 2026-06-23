@@ -18,6 +18,13 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1')
 # ALLOWED HOSTS
 ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')]
 
+# CSRF Trusted Origins for Django 4.0+ (Automatic based on ALLOWED_HOSTS)
+CSRF_TRUSTED_ORIGINS = [
+    f"https://{host}" for host in ALLOWED_HOSTS if not (host.startswith('localhost') or host.startswith('127.0.0.1'))
+] + [
+    f"http://{host}" for host in ALLOWED_HOSTS if host.startswith('localhost') or host.startswith('127.0.0.1')
+]
+
 
 # Application definition
 INSTALLED_APPS = [
