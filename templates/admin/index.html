@@ -4,19 +4,19 @@
 {% block extrastyle %}
 {{ block.super }}
 <style>
-    /* Premium BHEL Connect Dashboard Styles */
+    /* Premium BHEL Connect Dashboard Styles (Supporting Light & Dark Themes) */
     .dashboard-container {
         margin-bottom: 30px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     .dashboard-header {
         margin-bottom: 20px;
-        border-bottom: 2px solid #eaeaea;
+        border-bottom: 2px solid var(--border-color, #eaeaea);
         padding-bottom: 10px;
     }
     .dashboard-header h2 {
         margin: 0 !important;
-        color: #1e293b;
+        color: var(--body-fg, #1e293b);
         font-size: 24px;
         font-weight: 700;
     }
@@ -27,11 +27,11 @@
         margin-bottom: 30px;
     }
     .metric-card {
-        background: #ffffff;
+        background: var(--container-bg, #ffffff);
         border-radius: 12px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         padding: 20px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--border-color, #e2e8f0);
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .metric-card:hover {
@@ -40,7 +40,8 @@
     }
     .metric-label {
         font-size: 13px;
-        color: #64748b;
+        color: var(--body-fg, #64748b);
+        opacity: 0.7;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -48,19 +49,19 @@
     }
     .metric-value {
         font-size: 28px;
-        color: #0f172a;
+        color: var(--body-fg, #0f172a);
         font-weight: 700;
     }
     .metric-value.revenue {
-        color: #10b981;
+        color: #10b981 !important;
     }
     .metric-value.pending {
-        color: #f59e0b;
+        color: #f59e0b !important;
     }
     .analytics-section {
-        background: #ffffff;
+        background: var(--container-bg, #ffffff);
         border-radius: 12px;
-        border: 1px solid #e2e8f0;
+        border: 1px solid var(--border-color, #e2e8f0);
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         padding: 20px;
         margin-bottom: 30px;
@@ -68,10 +69,10 @@
     .analytics-title {
         font-size: 18px;
         font-weight: 600;
-        color: #1e293b;
+        color: var(--body-fg, #1e293b);
         margin-top: 0;
         margin-bottom: 15px;
-        border-bottom: 1px solid #e2e8f0;
+        border-bottom: 1px solid var(--border-color, #e2e8f0);
         padding-bottom: 10px;
     }
     .analytics-table {
@@ -81,32 +82,35 @@
     .analytics-table th {
         text-align: left;
         padding: 10px 12px;
-        background-color: #f8fafc;
-        color: #475569;
+        background-color: var(--darkened-bg, #f8fafc) !important;
+        color: var(--body-fg, #475569);
         font-weight: 600;
         font-size: 13px;
-        border-bottom: 2px solid #e2e8f0;
+        border-bottom: 2px solid var(--border-color, #e2e8f0);
     }
     .analytics-table td {
         padding: 12px;
-        border-bottom: 1px solid #f1f5f9;
+        border-bottom: 1px solid var(--border-color, #f1f5f9);
         font-size: 14px;
-        color: #334155;
+        color: var(--body-fg, #334155);
     }
-    .analytics-table tr:hover {
-        background-color: #f8fafc;
+    .analytics-table tr {
+        background-color: transparent !important;
+    }
+    .analytics-table tbody tr:hover {
+        background-color: var(--darkened-bg, #f8fafc) !important;
     }
     .badge {
         display: inline-block;
         padding: 4px 8px;
         border-radius: 9999px;
         font-size: 12px;
-        font-weight: 500;
+        font-weight: 600;
         text-transform: capitalize;
     }
-    .badge-available { background-color: #d1fae5; color: #065f46; }
-    .badge-reserved { background-color: #fef3c7; color: #92400e; }
-    .badge-sold { background-color: #e0f2fe; color: #075985; }
+    .badge-available { background-color: #d1fae5 !important; color: #065f46 !important; }
+    .badge-reserved { background-color: #fef3c7 !important; color: #92400e !important; }
+    .badge-sold { background-color: #e0f2fe !important; color: #075985 !important; }
 </style>
 {% endblock %}
 
