@@ -105,9 +105,9 @@ if db_url:
     url = urlparse.urlparse(db_url)
     DATABASES['default'] = {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': url.path[1:],
-        'USER': url.username,
-        'PASSWORD': url.password,
+        'NAME': urlparse.unquote(url.path[1:]) if url.path else '',
+        'USER': urlparse.unquote(url.username) if url.username else '',
+        'PASSWORD': urlparse.unquote(url.password) if url.password else '',
         'HOST': url.hostname,
         'PORT': url.port or '5432',
         'CONN_MAX_AGE': 0 if 'test' in sys.argv else 600,
