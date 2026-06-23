@@ -1,0 +1,47 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2>Smart Buy Campaign Successfully Closed!</h2>
+<p>Hello {{ user.name }},</p>
+<p>Congratulations! The campaign <strong>"{{ campaign.title }}"</strong> you participated in has closed successfully. Thanks to the group buying volume, the final discounted unit price has been locked!</p>
+
+<table class="detail-table">
+    <thead>
+        <tr>
+            <th colspan="2">Final Campaign Summary</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Campaign Title</strong></td>
+            <td>{{ campaign.title }}</td>
+        </tr>
+        <tr>
+            <td><strong>Final Group Price</strong></td>
+            <td class="highlight-row">₹{{ final_price|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Token Deposit Paid (10%)</strong></td>
+            <td>₹{{ token_amount|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Remaining Balance Due</strong></td>
+            <td style="color: #00509d; font-weight: bold;">₹{{ balance_due|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Total Confirmed Buyers</strong></td>
+            <td>{{ confirmed_buyers_count }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="alert-info">
+    <strong>Next Steps:</strong> The vendor is preparing the delivery schedule. You will receive invoice details and instructions on how to pay the remaining balance of <strong>₹{{ balance_due|floatformat:2 }}</strong> shortly.
+</div>
+
+<div class="btn-container">
+    <a href="{{ campaign_link }}" class="btn">View Campaign Details</a>
+</div>
+
+<p>Thank you for buying together and saving with BHEL Connect Smart Buy!</p>
+{% endblock %}

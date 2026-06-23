@@ -1,0 +1,21 @@
+Hello {{ user.name }},
+
+Your registration/waitlist booking for the campaign "{{ campaign.title }}" has been successfully cancelled as per your request.
+
+Cancellation Details:
+- Campaign: {{ campaign.title }}
+- Refund Status: {{ refund_status|upper }}
+- Refund Amount: ₹{{ refund_amount|floatformat:2 }}
+- Date: {{ date|date:"Y-m-d H:i:s" }}
+
+Refund Policy:
+{% if refund_status == "pending" %}
+A refund request for ₹{{ refund_amount|floatformat:2 }} has been initiated with the Cashfree Payment Gateway and will be credited to your original payment method in 5-7 working days.
+{% elif refund_status == "processed" %}
+Your refund has been processed successfully.
+{% else %}
+No refund was applicable (either no payment was made, or cancellation occurred after campaign closure/penalties applied).
+{% endif %}
+
+Thank you,
+BHEL Connect Smart Buy Team

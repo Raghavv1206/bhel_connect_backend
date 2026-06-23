@@ -1,0 +1,20 @@
+Hello {{ user.name }},
+
+We wanted to let you know that the token payment transaction for the campaign "{{ campaign.title }}" has failed or was cancelled.
+
+Because the token deposit payment could not be processed successfully, your reserved slot has been released back into campaign inventory.
+
+Transaction Status:
+- Campaign: {{ campaign.title }}
+- Order ID: {{ order_id }}
+- Amount: ₹{{ amount|floatformat:2 }}
+- Status: FAILED / REJECTED
+- Date: {{ date|date:"Y-m-d H:i:s" }}
+
+If this was a mistake, you can attempt to register again if slots are still available.
+
+Try registering again:
+{{ campaign_link }}
+
+Thank you,
+BHEL Connect Smart Buy Team

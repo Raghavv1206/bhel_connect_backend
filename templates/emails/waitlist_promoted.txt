@@ -1,0 +1,18 @@
+Hello {{ user.name }},
+
+A slot has opened up in the campaign "{{ campaign.title }}" and you have been promoted from the waitlist to a reserved booking slot.
+
+You must complete your token deposit payment of 10% (₹{{ amount|floatformat:2 }}) within 24 hours (before {{ expiry_date|date:"Y-m-d H:i:s" }}) to secure this slot. 
+
+If payment is not verified by this time, your slot will expire and be offered to the next employee in line.
+
+Promotion Details:
+- Campaign: {{ campaign.title }}
+- Token Deposit (10%): ₹{{ amount|floatformat:2 }}
+- Payment Deadline: {{ expiry_date|date:"Y-m-d H:i:s" }}
+
+Pay now:
+{{ campaign_link }}
+
+Thank you,
+BHEL Connect Smart Buy Team

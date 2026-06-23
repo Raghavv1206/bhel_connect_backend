@@ -1,0 +1,43 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2>Registration Initiated - Token Payment Pending</h2>
+<p>Hello {{ user.name }},</p>
+<p>You have initiated registration to join the group buying campaign <strong>"{{ campaign.title }}"</strong>. To secure your slot in this campaign, you must complete the 10% token deposit payment.</p>
+
+<div class="alert-info">
+    <strong>Action Required:</strong> Please complete your payment using the link below. Slots are reserved temporarily and may be released if payment is not finalized.
+</div>
+
+<table class="detail-table">
+    <thead>
+        <tr>
+            <th colspan="2">Order Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Campaign Title</strong></td>
+            <td>{{ campaign.title }}</td>
+        </tr>
+        <tr>
+            <td><strong>Order ID</strong></td>
+            <td><code>{{ order_id }}</code></td>
+        </tr>
+        <tr>
+            <td><strong>Token Deposit (10%)</strong></td>
+            <td class="highlight-row">₹{{ amount|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Date Initiated</strong></td>
+            <td>{{ date|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="btn-container">
+    <a href="{{ campaign_link }}" class="btn">Proceed to Campaign Dashboard</a>
+</div>
+
+<p>Thank you for choosing BHEL Connect Smart Buy!</p>
+{% endblock %}

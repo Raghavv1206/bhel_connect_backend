@@ -1,0 +1,7 @@
+python-interpreter-path = "c:/Users/ragha/project/BHEL CONNECT MARKETPLACE/venv/Scripts/python.exe"
+
+[errors]
+untyped-import = "ignore"
+bad-override = "ignore"
+missing-attribute = "ignore"
+bad-assignment = "ignore"

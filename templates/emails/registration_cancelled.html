@@ -1,0 +1,46 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2>Registration Cancelled</h2>
+<p>Hello {{ user.name }},</p>
+<p>Your registration / waitlist booking for the campaign <strong>"{{ campaign.title }}"</strong> has been successfully cancelled as per your request.</p>
+
+<table class="detail-table">
+    <thead>
+        <tr>
+            <th colspan="2">Cancellation Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Campaign Title</strong></td>
+            <td>{{ campaign.title }}</td>
+        </tr>
+        <tr>
+            <td><strong>Refund Status</strong></td>
+            <td><strong>{{ refund_status|upper }}</strong></td>
+        </tr>
+        <tr>
+            <td><strong>Refund Amount</strong></td>
+            <td class="highlight-row">₹{{ refund_amount|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Cancellation Date</strong></td>
+            <td>{{ date|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="alert-info">
+    <strong>Refund Information:</strong>
+    {% if refund_status == "pending" %}
+        A refund request for ₹{{ refund_amount|floatformat:2 }} has been initiated with the Cashfree Payment Gateway and will be credited to your original payment method in 5-7 working days.
+    {% elif refund_status == "processed" %}
+        Your refund has been processed.
+    {% else %}
+        No refund was applicable (either no payment was made or cancellation occurred after campaign closure/penalties applied).
+    {% endif %}
+</div>
+
+<p>Thank you for using BHEL Connect Smart Buy.</p>
+{% endblock %}

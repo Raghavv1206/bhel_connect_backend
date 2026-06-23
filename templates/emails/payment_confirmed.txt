@@ -1,0 +1,20 @@
+Hello {{ user.name }},
+
+We have successfully received and verified your token payment of ₹{{ amount|floatformat:2 }} for the campaign "{{ campaign.title }}". Your booking slot is now officially confirmed!
+
+Transaction Receipt:
+- Campaign: {{ campaign.title }}
+- Order ID: {{ order_id }}
+- Payment ID: {{ payment_id }}
+- Amount Paid: ₹{{ amount|floatformat:2 }}
+- Status: PAID / SUCCESSFUL
+- Date: {{ date|date:"Y-m-d H:i:s" }}
+
+What happens next?
+When the campaign closes, we will lock the final discounted unit price based on the total number of confirmed participants and notify you with the payment instructions for the remaining balance.
+
+You can view the campaign status here:
+{{ campaign_link }}
+
+Thank you,
+BHEL Connect Smart Buy Team

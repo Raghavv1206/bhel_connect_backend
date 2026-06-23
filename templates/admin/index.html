@@ -1,0 +1,176 @@
+{% extends "admin/index.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Premium BHEL Connect Dashboard Styles */
+    .dashboard-container {
+        margin-bottom: 30px;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .dashboard-header {
+        margin-bottom: 20px;
+        border-bottom: 2px solid #eaeaea;
+        padding-bottom: 10px;
+    }
+    .dashboard-header h2 {
+        margin: 0 !important;
+        color: #1e293b;
+        font-size: 24px;
+        font-weight: 700;
+    }
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+    .metric-card {
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        padding: 20px;
+        border: 1px solid #e2e8f0;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    .metric-label {
+        font-size: 13px;
+        color: #64748b;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 8px;
+    }
+    .metric-value {
+        font-size: 28px;
+        color: #0f172a;
+        font-weight: 700;
+    }
+    .metric-value.revenue {
+        color: #10b981;
+    }
+    .metric-value.pending {
+        color: #f59e0b;
+    }
+    .analytics-section {
+        background: #ffffff;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+    .analytics-title {
+        font-size: 18px;
+        font-weight: 600;
+        color: #1e293b;
+        margin-top: 0;
+        margin-bottom: 15px;
+        border-bottom: 1px solid #e2e8f0;
+        padding-bottom: 10px;
+    }
+    .analytics-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .analytics-table th {
+        text-align: left;
+        padding: 10px 12px;
+        background-color: #f8fafc;
+        color: #475569;
+        font-weight: 600;
+        font-size: 13px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .analytics-table td {
+        padding: 12px;
+        border-bottom: 1px solid #f1f5f9;
+        font-size: 14px;
+        color: #334155;
+    }
+    .analytics-table tr:hover {
+        background-color: #f8fafc;
+    }
+    .badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 9999px;
+        font-size: 12px;
+        font-weight: 500;
+        text-transform: capitalize;
+    }
+    .badge-available { background-color: #d1fae5; color: #065f46; }
+    .badge-reserved { background-color: #fef3c7; color: #92400e; }
+    .badge-sold { background-color: #e0f2fe; color: #075985; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    <div class="dashboard-header">
+        <h2>BHEL Connect Operational Dashboard</h2>
+    </div>
+
+    <!-- Metrics Grid -->
+    <div class="metrics-grid">
+        <div class="metric-card">
+            <div class="metric-label">Active Campaigns</div>
+            <div class="metric-value">{{ dashboard_stats.active_campaigns }}</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Pending Listings</div>
+            <div class="metric-value pending">{{ dashboard_stats.pending_listings }}</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">Total Revenue</div>
+            <div class="metric-value revenue">₹{{ dashboard_stats.total_revenue|floatformat:2 }}</div>
+        </div>
+        <div class="metric-card">
+            <div class="metric-label">New Users This Month</div>
+            <div class="metric-value">{{ dashboard_stats.new_users_this_month }}</div>
+        </div>
+    </div>
+
+    <!-- Top Viewed Listings -->
+    <div class="analytics-section">
+        <h3 class="analytics-title">Top 5 Viewed Marketplace Listings</h3>
+        {% if dashboard_stats.top_viewed_listings %}
+            <table class="analytics-table">
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Seller</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Status</th>
+                        <th>Views</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for listing in dashboard_stats.top_viewed_listings %}
+                        <tr>
+                            <td><strong><a href="{% url 'admin:marketplace_marketplacelisting_change' listing.id %}">{{ listing.title }}</a></strong></td>
+                            <td>{{ listing.seller }}</td>
+                            <td>{{ listing.category }}</td>
+                            <td>₹{{ listing.price }}</td>
+                            <td>
+                                <span class="badge badge-{{ listing.status }}">{{ listing.status }}</span>
+                            </td>
+                            <td>{{ listing.views }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <p style="color: #64748b; font-style: italic; margin: 0;">No active or viewed listings found.</p>
+        {% endif %}
+    </div>
+</div>
+
+{{ block.super }}
+{% endblock %}

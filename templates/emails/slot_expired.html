@@ -1,0 +1,41 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2>Slot Reservation Expired</h2>
+<p>Hello {{ user.name }},</p>
+<p>We are writing to inform you that your reserved slot for the campaign <strong>"{{ campaign.title }}"</strong> has expired.</p>
+
+<div class="alert-warning">
+    <strong>Time Window Closed:</strong> Because the token deposit payment was not completed within the required 24-hour promotion window, the slot was cancelled and passed to the next employee on the waitlist.
+</div>
+
+<table class="detail-table">
+    <thead>
+        <tr>
+            <th colspan="2">Expired Booking Details</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Campaign Title</strong></td>
+            <td>{{ campaign.title }}</td>
+        </tr>
+        <tr>
+            <td><strong>Status</strong></td>
+            <td><span style="color: #ef4444; font-weight: bold;">EXPIRED / CANCELLED</span></td>
+        </tr>
+        <tr>
+            <td><strong>Expiry Date</strong></td>
+            <td>{{ date|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>If you still wish to participate, you may join the waitlist again to wait for future slots.</p>
+
+<div class="btn-container">
+    <a href="{{ campaign_link }}" class="btn">View Campaign Status</a>
+</div>
+
+<p>Thank you for using BHEL Connect Smart Buy.</p>
+{% endblock %}

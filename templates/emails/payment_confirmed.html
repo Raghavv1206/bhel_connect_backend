@@ -1,0 +1,51 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2>Token Payment Confirmed! Slot Reserved</h2>
+<p>Hello {{ user.name }},</p>
+<p>Great news! We have successfully received and verified your token payment of <strong>₹{{ amount|floatformat:2 }}</strong> for the campaign <strong>"{{ campaign.title }}"</strong>. Your booking slot is now officially confirmed.</p>
+
+<table class="detail-table">
+    <thead>
+        <tr>
+            <th colspan="2">Payment Confirmation Receipt</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Campaign Title</strong></td>
+            <td>{{ campaign.title }}</td>
+        </tr>
+        <tr>
+            <td><strong>Order ID</strong></td>
+            <td><code>{{ order_id }}</code></td>
+        </tr>
+        <tr>
+            <td><strong>Cashfree Payment ID</strong></td>
+            <td><code>{{ payment_id }}</code></td>
+        </tr>
+        <tr>
+            <td><strong>Amount Paid</strong></td>
+            <td class="highlight-row">₹{{ amount|floatformat:2 }} (10% Token Deposit)</td>
+        </tr>
+        <tr>
+            <td><strong>Status</strong></td>
+            <td><span style="color: #10b981; font-weight: bold;">PAID / SUCCESSFUL</span></td>
+        </tr>
+        <tr>
+            <td><strong>Confirmation Date</strong></td>
+            <td>{{ date|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<div class="alert-info">
+    <strong>What happens next?</strong> As soon as the campaign closes or sell-out is reached, the final unit price will be locked based on the total number of confirmed participants. We will notify you with the final pricing and vendor delivery schedule.
+</div>
+
+<div class="btn-container">
+    <a href="{{ campaign_link }}" class="btn">View Campaign Status</a>
+</div>
+
+<p>Thank you for participating in BHEL Connect Smart Buy!</p>
+{% endblock %}

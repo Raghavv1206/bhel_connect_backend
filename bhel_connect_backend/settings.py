@@ -1,0 +1,254 @@
+import os
+from pathlib import Path
+from datetime import timedelta
+from dotenv import load_dotenv
+
+# Build paths inside the project like this: BASE_DIR / 'subdir'.
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load environment variables from .env file
+load_dotenv(os.path.join(BASE_DIR, '.env'))
+
+# SECRET KEY - read from env or fallback to a dev key (never expose in prod)
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-l8!wc!(%29-_8you_3ftl6=nb&!d8!w#kwb+0050ley9l%t2jb')
+
+# DEBUG status - default to False for safety
+DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1')
+
+# ALLOWED HOSTS
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')]
+
+
+# Application definition
+INSTALLED_APPS = [
+    'daphne',  # Daphne must be listed before staticfiles for ASGI
+    'django.contrib.admin',
+    'django.contrib.auth',
+    'django.contrib.contenttypes',
+    'django.contrib.sessions',
+    'django.contrib.messages',
+    'django.contrib.staticfiles',
+    
+    # Third Party Apps
+    'rest_framework',
+    'rest_framework_simplejwt.token_blacklist',
+    'corsheaders',
+    'django_filters',
+    'cloudinary',
+    'cloudinary_storage',
+    'channels',
+    
+    # Internal Project Apps
+    'users',
+    'smartbuy',
+    'marketplace',
+    'adminpanel',
+    'reports',
+    'notifications',
+]
+
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Replaces Nginx for serving static files in production
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CorsMiddleware must be placed before CommonMiddleware
+    'django.middleware.common.CommonMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # Audit log — must come AFTER AuthenticationMiddleware so request.user is resolved
+    'adminpanel.middleware.AuditLogMiddleware',
+]
+
+ROOT_URLCONF = 'bhel_connect_backend.urls'
+
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'DIRS': [BASE_DIR / 'templates'],
+        'APP_DIRS': True,
+        'OPTIONS': {
+            'context_processors': [
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
+                'django.contrib.messages.context_processors.messages',
+            ],
+        },
+    },
+]
+
+WSGI_APPLICATION = 'bhel_connect_backend.wsgi.application'
+ASGI_APPLICATION = 'bhel_connect_backend.asgi.application'
+
+
+import sys
+
+# Database Configuration
+# Primary: PostgreSQL (with SQLite fallback for local development)
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.environ.get('DB_NAME', 'bhel_connect'),
+        'USER': os.environ.get('DB_USER', 'bhel_user'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', 'your_db_password'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
+        'CONN_MAX_AGE': 0 if 'test' in sys.argv else 600,
+    }
+}
+
+# Fallback database if we are running in debug mode and postgres is not configured or uses default placeholders
+db_pass = os.environ.get('DB_PASSWORD', '')
+if 'test' in sys.argv:
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': str(BASE_DIR / 'db_test.sqlite3'),
+    }
+elif DEBUG and (not db_pass or db_pass == 'your_db_password' or db_pass == 'your_db_password_here'):
+    DATABASES['default'] = {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': str(BASE_DIR / 'db.sqlite3'),
+    }
+
+
+# Password validation
+AUTH_PASSWORD_VALIDATORS = [
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
+]
+
+
+# Internationalization
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'UTC'
+USE_I18N = True
+USE_TZ = True
+
+
+# Static & Media Storage Configuration (Cloudinary integration)
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+}
+
+# Auto-fallback to local filesystem storage if Cloudinary is not configured or uses placeholders
+cloud_name = CLOUDINARY_STORAGE.get('CLOUD_NAME', '')
+api_key = CLOUDINARY_STORAGE.get('API_KEY', '')
+api_secret = CLOUDINARY_STORAGE.get('API_SECRET', '')
+
+is_cloudinary_configured = bool(
+    cloud_name and not cloud_name.startswith('your_') and
+    api_key and not api_key.startswith('your_') and
+    api_secret and not api_secret.startswith('your_')
+)
+
+if is_cloudinary_configured:
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+else:
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
+# Default primary key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Custom User Model
+AUTH_USER_MODEL = 'users.Employee'
+
+
+# Django REST Framework Settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+}
+
+
+# SimpleJWT JWT Configuration
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'USER_ID_FIELD': 'employee_id',
+    'USER_ID_CLAIM': 'employee_id',
+}
+
+
+# CORS Configuration
+CORS_ALLOWED_ORIGINS = [
+    origin.strip() for origin in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173').split(',')
+]
+CORS_ALLOW_CREDENTIALS = True
+
+
+# Email/SMTP Configuration (Gmail SMTP for OTP delivery)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# Fallback email backend in debug mode for development convenience
+if DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'BHEL Connect <your_gmail@gmail.com>')
+
+
+# Redis Channel Layers (Required for WebSockets / Django Channels)
+redis_url = os.environ.get('REDIS_URL')
+use_redis = False
+
+if redis_url and not DEBUG:
+    # In production, always require Redis
+    use_redis = True
+elif redis_url and DEBUG:
+    # In local development, check if Redis is active; if not, fall back to InMemory
+    try:
+        import redis
+        r = redis.Redis.from_url(redis_url, socket_timeout=1)
+        r.ping()
+        use_redis = True
+    except Exception:
+        use_redis = False
+
+if use_redis:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                'hosts': [redis_url],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
+
+
+# Security Headers for Production Compliance
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+CSRF_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG

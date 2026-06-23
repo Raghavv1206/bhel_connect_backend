@@ -1,0 +1,17 @@
+Hello {{ user.name }},
+
+You have successfully joined the waitlist for the campaign "{{ campaign.title }}" because the main slots are currently sold out.
+
+Waitlist Details:
+- Campaign: {{ campaign.title }}
+- Waitlist Queue Position: #{{ position }}
+- Date: {{ date|date:"Y-m-d H:i:s" }}
+
+Note:
+Joining the waitlist is free. If a confirmed slot opens up, you will be promoted automatically according to your queue position. Once promoted, you will be notified to pay the token deposit within 24 hours.
+
+You can monitor your waitlist position here:
+{{ campaign_link }}
+
+Thank you,
+BHEL Connect Smart Buy Team

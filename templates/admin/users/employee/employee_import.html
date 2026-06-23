@@ -1,0 +1,224 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+    /* Styling for Bulk Employee Upload Form */
+    .import-container {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #ffffff;
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 24px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 24px;
+    }
+    .form-group {
+        margin-bottom: 20px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 14px;
+        font-weight: 600;
+        color: #334155;
+        margin-bottom: 8px;
+    }
+    .file-input-wrapper {
+        border: 2px dashed #cbd5e1;
+        padding: 30px;
+        border-radius: 8px;
+        text-align: center;
+        background: #f8fafc;
+        cursor: pointer;
+        transition: border-color 0.2s ease;
+    }
+    .file-input-wrapper:hover {
+        border-color: #0f766e;
+    }
+    .file-input-wrapper input[type="file"] {
+        display: none;
+    }
+    .file-input-label {
+        font-size: 14px;
+        color: #64748b;
+    }
+    .file-input-label strong {
+        color: #0f766e;
+    }
+    .btn-submit {
+        background-color: #0f766e;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    .btn-submit:hover {
+        background-color: #0d9488;
+    }
+    .results-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 24px;
+        background: #f8fafc;
+    }
+    .results-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .result-item {
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        padding: 15px;
+        text-align: center;
+    }
+    .result-item-val {
+        font-size: 24px;
+        font-weight: 700;
+        color: #0f172a;
+    }
+    .result-item-label {
+        font-size: 12px;
+        color: #64748b;
+        font-weight: 500;
+        margin-top: 4px;
+    }
+    .result-item-val.created { color: #10b981; }
+    .result-item-val.updated { color: #3b82f6; }
+    .result-item-val.skipped { color: #ef4444; }
+    
+    .errors-table-wrapper {
+        margin-top: 20px;
+    }
+    .errors-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .errors-table th {
+        background: #f1f5f9;
+        color: #475569;
+        font-weight: 600;
+        text-align: left;
+        padding: 10px 12px;
+        font-size: 13px;
+        border-bottom: 2px solid #e2e8f0;
+    }
+    .errors-table td {
+        padding: 10px 12px;
+        font-size: 13px;
+        border-bottom: 1px solid #e2e8f0;
+        color: #334155;
+    }
+    .errors-table tr:hover {
+        background: #f8fafc;
+    }
+    .errors-table tr.db-conflict {
+        background: #fff5f5;
+    }
+</style>
+<script>
+    function handleFileChange(event) {
+        const input = event.target;
+        const label = document.getElementById('file-label');
+        if (input.files && input.files.length > 0) {
+            label.innerHTML = `Selected file: <strong>${input.files[0].name}</strong> (${(input.files[0].size / 1024).toFixed(1)} KB)`;
+        } else {
+            label.innerHTML = `Drag & drop your CSV file here or <strong>browse</strong>`;
+        }
+    }
+</script>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+&rsaquo; <a href="{% url 'admin:app_list' app_label=app_label %}">{{ app_label|capfirst }}</a>
+&rsaquo; <a href="{% url 'admin:users_employee_changelist' %}">{{ opts.verbose_name_plural|capfirst }}</a>
+&rsaquo; Bulk Employee Import
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main" style="max-width: 900px;">
+    
+    {% if import_processed %}
+        <div class="results-card">
+            <h3 style="margin-top: 0; color: #1e293b;">Import Process Summary</h3>
+            <div class="results-grid">
+                <div class="result-item">
+                    <div class="result-item-val created">{{ created_count }}</div>
+                    <div class="result-item-label">Created</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-item-val updated">{{ updated_count }}</div>
+                    <div class="result-item-label">Updated</div>
+                </div>
+                <div class="result-item">
+                    <div class="result-item-val skipped">{{ skipped_count }}</div>
+                    <div class="result-item-label">Skipped (Errors)</div>
+                </div>
+            </div>
+
+            {% if row_errors %}
+                <div class="errors-table-wrapper">
+                    <h4 style="color: #b91c1c; margin-bottom: 10px;">Validation Errors Detail</h4>
+                    <table class="errors-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 80px;">CSV Row</th>
+                                <th style="width: 150px;">Employee ID</th>
+                                <th>Reason / Errors</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for err in row_errors %}
+                                <tr class="{% if err.row == 'DB Conflict' %}db-conflict{% endif %}">
+                                    <td><strong>{{ err.row }}</strong></td>
+                                    <td><code>{{ err.employee_id|default:"N/A" }}</code></td>
+                                    <td style="color: #b91c1c;">{{ err.reason }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+    {% endif %}
+
+    <div class="import-container">
+        <h3 style="margin-top: 0; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">Upload Employees CSV</h3>
+        
+        <p style="color: #475569; font-size: 14px; line-height: 1.5; margin-bottom: 20px;">
+            Please select a CSV file containing BHEL employees. The file must contain the following headers in the first row:<br/>
+            <code>employee_id</code>, <code>name</code>, <code>email</code>, <code>mobile</code>, <code>department</code>
+        </p>
+
+        <form action="" method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="form-group">
+                <label for="csv_file">Select Spreadsheet File (.csv)</label>
+                <div class="file-input-wrapper" onclick="document.getElementById('csv_file').click();">
+                    <input type="file" name="file" id="csv_file" accept=".csv" onchange="handleFileChange(event)"/>
+                    <div class="file-input-label" id="file-label">
+                        Drag & drop your CSV file here or <strong>browse</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 25px;">
+                <input type="submit" value="Upload & Import" class="btn-submit" />
+                <a href="{% url 'admin:users_employee_changelist' %}" class="button" style="margin-left: 10px; display: inline-block; padding: 10px 15px; background: #e2e8f0; color: #334155; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

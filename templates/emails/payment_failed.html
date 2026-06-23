@@ -1,0 +1,49 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2>Token Payment Failed</h2>
+<p>Hello {{ user.name }},</p>
+<p>We wanted to let you know that the token payment transaction for the campaign <strong>"{{ campaign.title }}"</strong> has failed or was cancelled.</p>
+
+<div class="alert-warning">
+    <strong>Reservation Released:</strong> Because the token deposit payment could not be processed successfully, your reserved slot has been released back into campaign inventory.
+</div>
+
+<table class="detail-table">
+    <thead>
+        <tr>
+            <th colspan="2">Transaction Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Campaign Title</strong></td>
+            <td>{{ campaign.title }}</td>
+        </tr>
+        <tr>
+            <td><strong>Order ID</strong></td>
+            <td><code>{{ order_id }}</code></td>
+        </tr>
+        <tr>
+            <td><strong>Payment Amount</strong></td>
+            <td>₹{{ amount|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Status</strong></td>
+            <td><span style="color: #ef4444; font-weight: bold;">FAILED / REJECTED</span></td>
+        </tr>
+        <tr>
+            <td><strong>Date</strong></td>
+            <td>{{ date|date:"Y-m-d H:i:s" }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<p>If this was a mistake, or you faced a technical glitch with the Cashfree payment gateway, you can attempt to register again if slots are still available.</p>
+
+<div class="btn-container">
+    <a href="{{ campaign_link }}" class="btn">Try Registering Again</a>
+</div>
+
+<p>Thank you for choosing BHEL Connect Smart Buy.</p>
+{% endblock %}

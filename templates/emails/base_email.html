@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ subject }}</title>
+    <style>
+        /* General resets for client compatibility */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        table {
+            border-collapse: collapse;
+        }
+        img {
+            border: 0;
+            outline: none;
+            text-decoration: none;
+        }
+        /* Layout */
+        .wrapper {
+            width: 100%;
+            background-color: #f4f6f9;
+            padding: 20px 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+            overflow: hidden;
+            border: 1px solid #e1e4e8;
+        }
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #003366 0%, #00509d 100%);
+            padding: 30px 20px;
+            text-align: center;
+            border-bottom: 4px solid #d4af37; /* Gold Accent */
+        }
+        .header h1 {
+            color: #ffffff;
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+        .header p {
+            color: #a3c2f0;
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        /* Body Content */
+        .content {
+            padding: 30px 25px;
+            color: #333333;
+            line-height: 1.6;
+            font-size: 15px;
+        }
+        .content h2 {
+            color: #003366;
+            font-size: 19px;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        /* Detail Table / Invoice */
+        .detail-table {
+            width: 100%;
+            margin: 20px 0;
+            border: 1px solid #eef2f5;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .detail-table th, .detail-table td {
+            padding: 12px 15px;
+            text-align: left;
+        }
+        .detail-table th {
+            background-color: #f8fafc;
+            color: #64748b;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #eef2f5;
+        }
+        .detail-table td {
+            border-bottom: 1px solid #eef2f5;
+            color: #334155;
+            font-size: 14px;
+        }
+        .detail-table tr:last-child td {
+            border-bottom: none;
+        }
+        .highlight-row {
+            background-color: #f0f7ff;
+            font-weight: bold;
+        }
+        .highlight-row td {
+            color: #00509d;
+        }
+        /* Buttons */
+        .btn-container {
+            text-align: center;
+            margin: 25px 0 10px 0;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #00509d;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 15px;
+            box-shadow: 0 4px 6px rgba(0, 80, 157, 0.15);
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #003366;
+        }
+        /* Alert boxes */
+        .alert-info {
+            background-color: #e0f2fe;
+            border-left: 4px solid #0ea5e9;
+            color: #0369a1;
+            padding: 15px;
+            border-radius: 0 6px 6px 0;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        .alert-warning {
+            background-color: #fef3c7;
+            border-left: 4px solid #d97706;
+            color: #92400e;
+            padding: 15px;
+            border-radius: 0 6px 6px 0;
+            margin: 20px 0;
+            font-size: 14px;
+        }
+        /* Footer */
+        .footer {
+            background-color: #f8fafc;
+            padding: 25px 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+            border-top: 1px solid #eef2f5;
+        }
+        .footer p {
+            margin: 5px 0;
+        }
+        .footer a {
+            color: #00509d;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <!-- Header -->
+            <div class="header">
+                <h1>BHEL CONNECT</h1>
+                <p>Smart Buy Group Buying Marketplace</p>
+            </div>
+            
+            <!-- Main Content -->
+            <div class="content">
+                {% block content %}{% endblock %}
+            </div>
+            
+            <!-- Footer -->
+            <div class="footer">
+                <p>This is an automated notification from BHEL Connect. Please do not reply directly to this email.</p>
+                <p>&copy; 2026 Bharat Heavy Electricals Limited (BHEL). All Rights Reserved.</p>
+                <p>If you need assistance, please contact the <a href="mailto:support.connect@bhel.in">BHEL Connect IT Support Desk</a>.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

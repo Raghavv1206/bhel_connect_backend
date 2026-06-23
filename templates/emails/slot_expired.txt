@@ -1,0 +1,18 @@
+Hello {{ user.name }},
+
+Your reserved slot for the campaign "{{ campaign.title }}" has expired.
+
+Because the token deposit payment was not completed within the required 24-hour promotion window, the slot was cancelled and passed to the next employee on the waitlist.
+
+Campaign Details:
+- Campaign: {{ campaign.title }}
+- Status: EXPIRED / CANCELLED
+- Expiry Date: {{ date|date:"Y-m-d H:i:s" }}
+
+If you still wish to participate, you may join the waitlist again to wait for future slots.
+
+View Campaign:
+{{ campaign_link }}
+
+Thank you,
+BHEL Connect Smart Buy Team

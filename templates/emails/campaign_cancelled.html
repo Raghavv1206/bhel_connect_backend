@@ -1,0 +1,52 @@
+{% extends "emails/base_email.html" %}
+
+{% block content %}
+<h2>Smart Buy Campaign Cancelled</h2>
+<p>Hello {{ user.name }},</p>
+<p>We regret to inform you that the campaign <strong>"{{ campaign.title }}"</strong> has been cancelled by the administrator.</p>
+
+<div class="alert-warning">
+    <strong>Campaign Cancelled:</strong>
+    {% if reg_status == "approved" %}
+        A full refund of your 10% token deposit (<strong>₹{{ token_amount|floatformat:2 }}</strong>) has been initiated and will be credited to your original payment method in 5-7 working days.
+    {% else %}
+        Your pending registration has been voided. No payment was captured, so no refund is necessary.
+    {% endif %}
+</div>
+
+<table class="detail-table">
+    <thead>
+        <tr>
+            <th colspan="2">Campaign Cancellation details</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td><strong>Campaign Title</strong></td>
+            <td>{{ campaign.title }}</td>
+        </tr>
+        <tr>
+            <td><strong>Status</strong></td>
+            <td><span style="color: #ef4444; font-weight: bold;">CANCELLED</span></td>
+        </tr>
+        {% if reg_status == "approved" %}
+        <tr>
+            <td><strong>Token Amount to Refund</strong></td>
+            <td class="highlight-row">₹{{ token_amount|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td><strong>Refund Status</strong></td>
+            <td>PENDING / GATEWAY REFUND</td>
+        </tr>
+        {% endif %}
+    </tbody>
+</table>
+
+<p>We apologize for any inconvenience caused. You can explore other active Smart Buy campaigns on the platform.</p>
+
+<div class="btn-container">
+    <a href="{{ dashboard_link }}" class="btn">View Other Campaigns</a>
+</div>
+
+<p>Best regards,<br>BHEL Connect Smart Buy Team</p>
+{% endblock %}
