@@ -4,19 +4,20 @@
 {% block extrastyle %}
 {{ block.super }}
 <style>
-    /* Premium BHEL Connect Dashboard Styles (Supporting Light & Dark Themes) */
+    /* Premium BHEL Connect Dashboard Styles - Forced Light Theme for perfect readability */
     .dashboard-container {
         margin-bottom: 30px;
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        color: #334155 !important;
     }
     .dashboard-header {
         margin-bottom: 20px;
-        border-bottom: 2px solid var(--border-color, #eaeaea);
+        border-bottom: 2px solid #eaeaea !important;
         padding-bottom: 10px;
     }
     .dashboard-header h2 {
         margin: 0 !important;
-        color: var(--body-fg, #1e293b);
+        color: #1e293b !important;
         font-size: 24px;
         font-weight: 700;
     }
@@ -27,29 +28,29 @@
         margin-bottom: 30px;
     }
     .metric-card {
-        background: var(--container-bg, #ffffff);
+        background: #ffffff !important;
         border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
         padding: 20px;
-        border: 1px solid var(--border-color, #e2e8f0);
+        border: 1px solid #e2e8f0 !important;
         transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .metric-card:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.03);
     }
     .metric-label {
         font-size: 13px;
-        color: var(--body-fg, #64748b);
-        opacity: 0.7;
+        color: #64748b !important;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         margin-bottom: 8px;
+        opacity: 1 !important;
     }
     .metric-value {
         font-size: 28px;
-        color: var(--body-fg, #0f172a);
+        color: #0f172a !important;
         font-weight: 700;
     }
     .metric-value.revenue {
@@ -59,20 +60,20 @@
         color: #f59e0b !important;
     }
     .analytics-section {
-        background: var(--container-bg, #ffffff);
+        background: #ffffff !important;
         border-radius: 12px;
-        border: 1px solid var(--border-color, #e2e8f0);
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        border: 1px solid #e2e8f0 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         padding: 20px;
         margin-bottom: 30px;
     }
     .analytics-title {
         font-size: 18px;
         font-weight: 600;
-        color: var(--body-fg, #1e293b);
+        color: #1e293b !important;
         margin-top: 0;
         margin-bottom: 15px;
-        border-bottom: 1px solid var(--border-color, #e2e8f0);
+        border-bottom: 1px solid #e2e8f0 !important;
         padding-bottom: 10px;
     }
     .analytics-table {
@@ -82,23 +83,30 @@
     .analytics-table th {
         text-align: left;
         padding: 10px 12px;
-        background-color: var(--darkened-bg, #f8fafc) !important;
-        color: var(--body-fg, #475569);
+        background-color: #f8fafc !important;
+        color: #475569 !important;
         font-weight: 600;
         font-size: 13px;
-        border-bottom: 2px solid var(--border-color, #e2e8f0);
+        border-bottom: 2px solid #e2e8f0 !important;
     }
     .analytics-table td {
         padding: 12px;
-        border-bottom: 1px solid var(--border-color, #f1f5f9);
+        border-bottom: 1px solid #f1f5f9 !important;
         font-size: 14px;
-        color: var(--body-fg, #334155);
+        color: #334155 !important;
     }
     .analytics-table tr {
-        background-color: transparent !important;
+        background-color: #ffffff !important;
     }
     .analytics-table tbody tr:hover {
-        background-color: var(--darkened-bg, #f8fafc) !important;
+        background-color: #f8fafc !important;
+    }
+    .analytics-table a {
+        color: #003366 !important;
+        text-decoration: underline !important;
+    }
+    .analytics-table a:hover {
+        color: #002244 !important;
     }
     .badge {
         display: inline-block;
