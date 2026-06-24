@@ -1,6 +1,8 @@
 import hashlib
 import secrets
 import logging
+import threading
+import sys
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
@@ -99,32 +101,36 @@ class RequestOTPView(APIView):
             otp_code=hashed_otp
         )
 
-        # Dispatch OTP via official BHEL Email
-        try:
-            send_mail(
-                subject="BHEL Connect - Your Secure Login OTP",
-                message=(
-                    f"Hello {employee.name},\n\n"
-                    f"Your OTP for logging into BHEL Connect is: {otp_code}\n\n"
-                    f"This OTP is valid for 10 minutes and can only be used once.\n\n"
-                    f"If you did not request this OTP, please contact the security team.\n\n"
-                    f"Regards,\n"
-                    f"BHEL Connect Team"
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[employee.email],
-                fail_silently=False,
-            )
-        except Exception as e:
-            logger.error(f"Failed to send OTP email to {employee.email}: {str(e)}")
-            # If in debug mode, fail silently so developers see OTP in console
-            if not settings.DEBUG:
-                # In production, clean up record and raise an error
-                otp_record.delete()
-                return Response(
-                    {"detail": "Email service error. Failed to dispatch OTP. Please try again later."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        # Dispatch OTP via official BHEL Email in a background thread
+        # to prevent SMTP latency/handshake from blocking the main ASGI request thread.
+        def _send_email():
+            try:
+                send_mail(
+                    subject="BHEL Connect - Your Secure Login OTP",
+                    message=(
+                        f"Hello {employee.name},\n\n"
+                        f"Your OTP for logging into BHEL Connect is: {otp_code}\n\n"
+                        f"This OTP is valid for 10 minutes and can only be used once.\n\n"
+                        f"If you did not request this OTP, please contact the security team.\n\n"
+                        f"Regards,\n"
+                        f"BHEL Connect Team"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[employee.email],
+                    fail_silently=False,
                 )
+                logger.info(f"Successfully dispatched OTP email to {employee.email}")
+            except Exception as e:
+                logger.error(f"Failed to send OTP email to {employee.email}: {str(e)}", exc_info=True)
+
+        # If running tests, dispatch synchronously to avoid race conditions with assertions
+        is_testing = 'test' in sys.argv or getattr(settings, 'TESTING', False)
+        if is_testing:
+            _send_email()
+        else:
+            email_thread = threading.Thread(target=_send_email)
+            email_thread.daemon = True
+            email_thread.start()
 
         return Response(
             {"detail": "OTP sent successfully to your email"},
