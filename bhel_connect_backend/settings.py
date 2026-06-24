@@ -234,18 +234,42 @@ CORS_ALLOWED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 
-# Email/SMTP Configuration (Gmail SMTP for OTP delivery)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# Fallback email backend in debug mode for development convenience
+# Email API Configuration (HTTP-based Transactional Email)
+# Integrates with django-anymail to support SendGrid, Brevo, Resend, or SMTP/Console fallbacks.
+EMAIL_BACKEND_PROVIDER = os.environ.get('EMAIL_BACKEND_PROVIDER', 'smtp').lower()
+
 if DEBUG:
+    # Use console email backend for local development convenience to avoid needing API keys
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+elif EMAIL_BACKEND_PROVIDER == 'sendgrid':
+    EMAIL_BACKEND = 'anymail.backends.sendgrid.EmailBackend'
+    ANYMAIL = {
+        'SENDGRID_API_KEY': os.environ.get('SENDGRID_API_KEY'),
+    }
+elif EMAIL_BACKEND_PROVIDER == 'brevo':
+    EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
+    ANYMAIL = {
+        'BREVO_API_KEY': os.environ.get('BREVO_API_KEY'),
+    }
+elif EMAIL_BACKEND_PROVIDER == 'resend':
+    EMAIL_BACKEND = 'anymail.backends.resend.EmailBackend'
+    ANYMAIL = {
+        'RESEND_API_KEY': os.environ.get('RESEND_API_KEY'),
+    }
+else:
+    # Fallback to SMTP if EMAIL_BACKEND_PROVIDER is set to 'smtp' or not specified
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
+# Standard Django email settings used by the SMTP backend or as defaults
 EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True').lower() in ('true', '1')
 EMAIL_TIMEOUT = 10  # Enforce 10-second socket timeout to prevent thread leaks when ports are blocked
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'BHEL Connect <your_gmail@gmail.com>')
+
+# Default sender identity displayed to users
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'BHEL Connect <getmeachai.noreply@gmail.com>')
 
 
 # Redis Channel Layers (Required for WebSockets / Django Channels)
