@@ -207,18 +207,25 @@ class CampaignViewSet(viewsets.ModelViewSet):
             )
 
         days = request.data.get('days')
-        if not days or int(days) <= 0:
+        try:
+            days_int = int(days)
+        except (ValueError, TypeError):
             return Response(
-                {"detail": "A positive integer 'days' parameter is required."}, 
+                {"detail": "A valid positive integer 'days' parameter is required."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if days_int <= 0:
+            return Response(
+                {"detail": "A positive integer 'days' parameter is required."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        campaign.duration_days += int(days)
-        campaign.end_date += timedelta(days=int(days))
+        campaign.duration_days += days_int
+        campaign.end_date += timedelta(days=days_int)
         campaign.save()
 
         return Response(
-            {"detail": f"Campaign extended successfully by {days} days."}, 
+            {"detail": f"Campaign extended successfully by {days_int} days."}, 
             status=status.HTTP_200_OK
         )
 
@@ -379,11 +386,17 @@ class CampaignViewSet(viewsets.ModelViewSet):
                 }, status=status.HTTP_201_CREATED)
 
             except Exception as e:
+                # Cashfree order creation failed — reclaim the campaign slot
+                if not existing:
+                    # Only reclaim slot if we created a new registration (not reusing existing)
+                    campaign.available_quantity += 1
+                    campaign.save()
+                    registration.delete()
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to create Cashfree order for registration: {e}", exc_info=True)
                 return Response(
-                    {"detail": f"Failed to initiate payment transaction with gateway: {str(e)}"},
+                    {"detail": "Failed to initiate payment transaction with gateway. Please try again."},
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
 

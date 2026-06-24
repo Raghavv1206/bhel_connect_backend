@@ -1,6 +1,8 @@
 import json
 import hashlib
 import logging
+import time
+from collections import deque
 from urllib.parse import parse_qs
 from django.contrib.auth import get_user_model
 from channels.generic.websocket import AsyncWebsocketConsumer
@@ -142,8 +144,13 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Hash sorted employee IDs to guarantee channel group name contains only safe alphanumeric characters
         user_ids = sorted([self.user.employee_id, self.other_user.employee_id])
         combined_ids = f"{user_ids[0]}_{user_ids[1]}"
-        hashed_ids = hashlib.md5(combined_ids.encode('utf-8')).hexdigest()
+        hashed_ids = hashlib.sha256(combined_ids.encode('utf-8')).hexdigest()[:32]
         self.room_group_name = f"chat_listing_{self.listing_id}_{hashed_ids}"
+        
+        # Initialize rate limiter: max 30 messages per 60 seconds per connection
+        self._message_timestamps = deque(maxlen=30)
+        self._rate_limit_max = 30
+        self._rate_limit_window = 60  # seconds
         
         # Join room group
         await self.channel_layer.group_add(
@@ -191,6 +198,21 @@ class ChatConsumer(AsyncWebsocketConsumer):
         # Truncate messages exceeding length limit to prevent database flooding
         if len(message_text) > 1000:
             message_text = message_text[:1000]
+        
+        # Rate limiting: reject messages if client exceeds 30 messages per 60 seconds
+        now = time.time()
+        if hasattr(self, '_message_timestamps'):
+            # Remove timestamps outside the window
+            while self._message_timestamps and self._message_timestamps[0] < now - self._rate_limit_window:
+                self._message_timestamps.popleft()
+            
+            if len(self._message_timestamps) >= self._rate_limit_max:
+                await self.send(text_data=json.dumps({
+                    'type': 'error',
+                    'message': 'Rate limit exceeded. Please slow down.'
+                }))
+                return
+            self._message_timestamps.append(now)
             
         # Save message record
         try:

@@ -50,6 +50,13 @@ class EmployeeSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError("Mobile number must be a valid 10-digit Indian number starting with 6, 7, 8 or 9.")
         return value
 
+    def validate_is_admin(self, value):
+        """
+        Defense-in-depth: Explicitly reject any attempt to modify is_admin via API.
+        This is already in read_only_fields but an explicit validator prevents bypass.
+        """
+        raise serializers.ValidationError("The is_admin field cannot be modified via the API.")
+
     def validate_profile_picture(self, value):
         """
         Validate profile picture format and size (max 5MB).

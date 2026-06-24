@@ -88,6 +88,12 @@ class RequestOTPView(APIView):
         hashed_otp = hashlib.sha256(otp_code.encode('utf-8')).hexdigest()
 
         # Create OTPVerification record (expires_at is automatically handled in save())
+        # Invalidate all previous unused OTPs for this employee to prevent multiple valid OTPs
+        OTPVerification.objects.filter(
+            employee=employee,
+            is_used=False
+        ).update(is_used=True)
+
         otp_record = OTPVerification.objects.create(
             employee=employee,
             otp_code=hashed_otp
@@ -439,9 +445,18 @@ class EmployeeDetailView(APIView):
     def patch(self, request, employee_id):
         employee = get_object_or_404(Employee, employee_id=employee_id)
         
+        # Security: Only allow toggling is_active via direct field update.
+        # All other fields must go through the serializer (which enforces read_only_fields).
         if 'is_active' in request.data:
+            # Prevent admin from deactivating themselves
+            if employee == request.user:
+                return Response(
+                    {"detail": "You cannot deactivate your own account."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            # Only process is_active — ignore any other fields in this code path
             employee.is_active = bool(request.data['is_active'])
-            employee.save()
+            employee.save(update_fields=['is_active'])
             serializer = EmployeeSerializer(employee, context={'request': request})
             return Response(serializer.data, status=status.HTTP_200_OK)
             

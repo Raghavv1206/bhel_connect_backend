@@ -46,8 +46,10 @@ class NotificationListView(APIView):
             serializer = NotificationSerializer(notifications, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("Failed to load notifications: %s", e, exc_info=True)
             return Response(
-                {"detail": f"An error occurred while loading notifications: {str(e)}"},
+                {"detail": "An error occurred while loading notifications. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -69,8 +71,10 @@ class NotificationUnreadCountView(APIView):
             count = Notification.objects.filter(recipient=request.user, is_read=False).count()
             return Response({"unread_count": count}, status=status.HTTP_200_OK)
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("Failed to fetch unread count: %s", e, exc_info=True)
             return Response(
-                {"detail": f"An error occurred while fetching unread count: {str(e)}"},
+                {"detail": "An error occurred while fetching unread count. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -99,8 +103,10 @@ class MarkNotificationReadView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("Failed to mark notification as read: %s", e, exc_info=True)
             return Response(
-                {"detail": f"An error occurred while marking notification as read: {str(e)}"},
+                {"detail": "An error occurred while marking notification as read. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -121,7 +127,9 @@ class MarkAllNotificationsReadView(APIView):
             Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
             return Response({"detail": "All notifications marked as read."}, status=status.HTTP_200_OK)
         except Exception as e:
+            import logging
+            logging.getLogger(__name__).error("Failed to update notifications: %s", e, exc_info=True)
             return Response(
-                {"detail": f"An error occurred while updating notifications: {str(e)}"},
+                {"detail": "An error occurred while updating notifications. Please try again later."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

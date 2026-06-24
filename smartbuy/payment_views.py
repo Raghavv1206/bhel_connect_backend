@@ -173,13 +173,19 @@ class CashfreeWebhookView(APIView):
                 cf_order = cf.fetch_cashfree_order(order_id)
                 if cf_order.order_status == 'PAID':
                     with transaction.atomic():  # type: ignore
+                        # Lock payment and registration rows to prevent concurrent webhook processing
+                        token_payment = TokenPayment.objects.select_for_update().get(id=token_payment.id)
+                        # Re-check idempotency inside the lock
+                        if token_payment.status in ['approved', 'rejected']:
+                            return Response({"detail": "Payment already processed"}, status=status.HTTP_200_OK)
+
                         # Update payment status
                         token_payment.status = 'approved'
                         token_payment.cashfree_payment_id = cf_payment_id
                         token_payment.save()
 
                         # Update registration
-                        reg = token_payment.registration
+                        reg = CampaignRegistration.objects.select_for_update().get(id=token_payment.registration_id)
                         reg.payment_status = 'approved'
                         reg.save()
 
@@ -199,22 +205,28 @@ class CashfreeWebhookView(APIView):
                 return Response({"detail": "Fulfillment verification failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         elif event_type == 'PAYMENT_FAILED_WEBHOOK':
-            # Handle payment failure explicitly
+            # Handle payment failure with proper row locking
             with transaction.atomic():  # type: ignore
+                token_payment = TokenPayment.objects.select_for_update().get(id=token_payment.id)
+                # Re-check idempotency inside the lock
+                if token_payment.status in ['approved', 'rejected']:
+                    return Response({"detail": "Payment already processed"}, status=status.HTTP_200_OK)
+
                 token_payment.status = 'rejected'
                 token_payment.cashfree_payment_id = cf_payment_id
                 token_payment.save()
 
-                reg = token_payment.registration
+                reg = CampaignRegistration.objects.select_for_update().get(id=token_payment.registration_id)
                 reg.payment_status = 'cancelled'
                 reg.save()
 
-                # Reclaim campaign inventory slot
-                campaign = reg.campaign
+                # Reclaim campaign inventory slot with select_for_update to prevent race conditions
+                from smartbuy.models import Campaign
+                campaign = Campaign.objects.select_for_update().get(id=reg.campaign_id)
                 campaign.available_quantity += 1
                 campaign.save()
 
-            # Notify employee about failure
+            # Notify employee about failure (outside transaction)
             create_notification(
                 recipient=reg.employee,
                 title="Payment Transaction Failed",

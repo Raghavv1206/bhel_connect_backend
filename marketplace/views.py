@@ -399,13 +399,13 @@ class ChatMessageHistoryView(APIView):
 
         listing = get_object_or_404(MarketplaceListing, id=listing_id)
 
-        # Access control: verify that user is either the seller or is chatting with the seller
+        # Access control: User must be the seller, or the other_user must be the seller.
+        # This ensures only buyer-seller conversations are accessible.
         if listing.seller != user and listing.seller.employee_id != other_user_id:
-            if other_user_id != listing.seller.employee_id:
-                return Response(
-                    {"detail": "You do not have permission to access this chat conversation."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+            return Response(
+                {"detail": "You do not have permission to access this chat conversation."},
+                status=status.HTTP_403_FORBIDDEN
+            )
 
         # Query messages between participants for this listing
         messages = ChatMessage.objects.filter(
@@ -413,9 +413,16 @@ class ChatMessageHistoryView(APIView):
             (Q(sender=user, receiver_id=other_user_id) | Q(sender_id=other_user_id, receiver=user))
         ).select_related('sender', 'receiver').order_by('timestamp')
 
-        # Limit and Offset pagination
-        limit = int(request.query_params.get('limit', 50))
-        offset = int(request.query_params.get('offset', 0))
+        # Safe integer parsing with defaults and caps to prevent abuse
+        try:
+            limit = min(int(request.query_params.get('limit', 50)), 100)  # Cap at 100
+            limit = max(limit, 1)  # Minimum 1
+        except (ValueError, TypeError):
+            limit = 50
+        try:
+            offset = max(int(request.query_params.get('offset', 0)), 0)
+        except (ValueError, TypeError):
+            offset = 0
         total_count = messages.count()
 
         # Fetch messages sliced from the end (newest first in terms of offset)

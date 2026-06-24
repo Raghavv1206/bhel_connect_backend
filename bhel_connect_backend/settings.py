@@ -18,12 +18,17 @@ DEBUG = os.environ.get('DEBUG', 'False').lower() in ('true', '1')
 # ALLOWED HOSTS
 ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')]
 
-# CSRF Trusted Origins for Django 4.0+ (Automatic based on ALLOWED_HOSTS)
-CSRF_TRUSTED_ORIGINS = [
-    f"https://{host}" for host in ALLOWED_HOSTS if not (host.startswith('localhost') or host.startswith('127.0.0.1'))
-] + [
-    f"http://{host}" for host in ALLOWED_HOSTS if host.startswith('localhost') or host.startswith('127.0.0.1')
-]
+# CSRF Trusted Origins for Django 4.0+ (Automatic based on ALLOWED_HOSTS, with environment override)
+csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if csrf_env:
+    CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in csrf_env.split(',')]
+else:
+    CSRF_TRUSTED_ORIGINS = [
+        f"https://{host}" for host in ALLOWED_HOSTS if host != '*' and not (host.startswith('localhost') or host.startswith('127.0.0.1'))
+    ] + [
+        f"http://{host}" for host in ALLOWED_HOSTS if host != '*' and (host.startswith('localhost') or host.startswith('127.0.0.1'))
+    ]
+
 
 
 # Application definition
@@ -171,13 +176,22 @@ is_cloudinary_configured = bool(
     api_secret and not api_secret.startswith('your_')
 )
 
-if is_cloudinary_configured:
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-else:
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+# Modern STORAGES configuration (Django 4.2+) — replaces deprecated DEFAULT_FILE_STORAGE and STATICFILES_STORAGE
+STORAGES = {
+    'default': {
+        'BACKEND': 'cloudinary_storage.storage.MediaCloudinaryStorage' if is_cloudinary_configured else 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
+
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Limit max request body size to 10MB (prevents abuse via large uploads)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10 MB
 
 
 # Default primary key field type
@@ -274,3 +288,11 @@ X_FRAME_OPTIONS = 'DENY'
 CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
+
+# HTTPS enforcement & HSTS headers (production only)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  # Required for Render/Railway/Heroku
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
