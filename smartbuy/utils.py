@@ -173,9 +173,10 @@ def check_and_close_campaign(campaign):
             if notifications:
                 create_notifications_bulk(notifications)
 
-            from .emails import send_campaign_closed_email
+            from .emails import send_campaign_closed_email, send_campaign_report_to_admin
             reg_list = list(registrations)
             transaction.on_commit(lambda: send_campaign_closed_email(campaign_to_close, reg_list))
+            transaction.on_commit(lambda: send_campaign_report_to_admin(campaign_to_close))
 
             # Sync current campaign object state
             campaign.status = 'closed'

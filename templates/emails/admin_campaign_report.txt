@@ -1,0 +1,24 @@
+Hello {{ admin_name }},
+
+The campaign "{{ campaign.title }}" has closed successfully.
+
+Attached to this email, you will find an Excel workbook ({{ filename }}) containing all the details of the employees who registered. The workbook is split into two sheets:
+1. Confirmed Bookings: Confirmed employees who have paid their token deposit.
+2. Pending & Waitlisted: Employees on the waitlist or whose payments are still being processed/cancelled.
+
+Campaign Closing Summary:
+- Campaign Title: {{ campaign.title }}
+- Final Locked Price: ₹{{ final_price|floatformat:2 }}
+- Total Confirmed Buyers: {{ confirmed_buyers_count }}
+- Total Waitlist Size: {{ waitlist_count }}
+- Total Quantity Offered: {{ campaign.total_quantity }}
+- Remaining Available: {{ campaign.available_quantity }}
+- Vendor: {{ campaign.vendor.name }}
+
+Please use the attached Excel file to coordinate procurement and shipping logistics with the vendor.
+
+You can manage this campaign and view details here:
+{{ dashboard_link }}
+
+Best regards,
+BHEL Connect Team

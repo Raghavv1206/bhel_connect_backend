@@ -399,3 +399,114 @@ def format_report_date(dt):
         return local_dt.strftime("%d-%b-%Y")
     except Exception:
         return str(dt)
+
+
+def generate_campaign_bookings_excel(campaign):
+    """
+    Generates an Excel workbook with two sheets:
+    1. Confirmed Bookings (Approved payment, not waitlisted)
+    2. Pending & Waitlisted (Pending, rejected, or cancelled payments, or waitlisted)
+    Returns a bytes object of the generated workbook.
+    """
+    import io
+    from decimal import Decimal
+    from openpyxl import Workbook
+    from smartbuy.models import CampaignRegistration
+    
+    wb = Workbook()
+    
+    # ── Sheet 1: Confirmed Bookings ──────────────────────────────────────────
+    ws_confirmed = wb.active
+    ws_confirmed.title = "Confirmed Bookings"
+    
+    confirmed_headers = [
+        "Employee ID", "Name", "Department", "Email", 
+        "Mobile", "Token Paid (₹)", "Final Price (₹)", "Remaining Due (₹)", "Booking Date"
+    ]
+    
+    # Get confirmed bookings
+    confirmed_regs = CampaignRegistration.objects.filter(
+        campaign=campaign,
+        payment_status='approved',
+        is_waitlisted=False
+    ).select_related('employee').order_by('reservation_date')
+    
+    final_price = campaign.get_current_price()
+    
+    row_num = excel_add_bhel_header(ws_confirmed, f"Confirmed Bookings - {campaign.title}", len(confirmed_headers))
+    row_num = excel_write_header_row(ws_confirmed, row_num, confirmed_headers)
+    
+    confirmed_rows = []
+    for reg in confirmed_regs:
+        emp = reg.employee
+        token_paid = reg.token_amount or Decimal("0.00")
+        
+        if final_price is not None:
+            rem_due = max(Decimal("0.00"), final_price - token_paid)
+            final_price_val = final_price
+        else:
+            rem_due = Decimal("0.00")
+            final_price_val = Decimal("0.00")
+            
+        confirmed_rows.append([
+            emp.employee_id,
+            emp.name,
+            emp.department,
+            emp.email,
+            emp.mobile or "N/A",
+            float(token_paid),
+            float(final_price_val),
+            float(rem_due),
+            format_report_date(reg.reservation_date)
+        ])
+        
+    row_num = excel_write_data_rows(ws_confirmed, row_num, confirmed_rows, currency_columns=[5, 6, 7])
+    excel_write_summary_row(ws_confirmed, row_num, f"Total Confirmed: {len(confirmed_rows)} employees", len(confirmed_headers))
+    excel_auto_size_columns(ws_confirmed)
+    
+    # ── Sheet 2: Pending & Waitlisted ────────────────────────────────────────
+    ws_pending = wb.create_sheet(title="Pending & Waitlisted")
+    
+    pending_headers = [
+        "Employee ID", "Name", "Department", "Email", 
+        "Mobile", "Status", "Waitlist Position", "Token Deposit (₹)", "Cashfree Order ID", "Slot Expiry Date", "Registration Date"
+    ]
+    
+    # Get pending and waitlisted (exclude confirmed)
+    pending_regs = CampaignRegistration.objects.filter(
+        campaign=campaign
+    ).exclude(
+        payment_status='approved',
+        is_waitlisted=False
+    ).select_related('employee').order_by('is_waitlisted', 'waitlist_position', 'reservation_date')
+    
+    row_num = excel_add_bhel_header(ws_pending, f"Pending & Waitlisted Bookings - {campaign.title}", len(pending_headers))
+    row_num = excel_write_header_row(ws_pending, row_num, pending_headers)
+    
+    pending_rows = []
+    for reg in pending_regs:
+        emp = reg.employee
+        status_str = "Waitlisted" if reg.is_waitlisted else reg.get_payment_status_display()
+        token_amt = reg.token_amount or Decimal("0.00")
+        
+        pending_rows.append([
+            emp.employee_id,
+            emp.name,
+            emp.department,
+            emp.email,
+            emp.mobile or "N/A",
+            status_str,
+            reg.waitlist_position or "N/A",
+            float(token_amt),
+            reg.cashfree_order_id or "N/A",
+            format_report_date(reg.slot_expiry_date) if reg.slot_expiry_date else "N/A",
+            format_report_date(reg.reservation_date)
+        ])
+        
+    row_num = excel_write_data_rows(ws_pending, row_num, pending_rows, currency_columns=[7])
+    excel_write_summary_row(ws_pending, row_num, f"Total Pending & Waitlisted: {len(pending_rows)} registrations", len(pending_headers))
+    excel_auto_size_columns(ws_pending)
+    
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()

@@ -120,8 +120,9 @@ class CampaignViewSet(viewsets.ModelViewSet):
 
             # Evaluate registrations query to a list for the commit hook
             reg_list = list(registrations)
-            from .emails import send_campaign_closed_email
+            from .emails import send_campaign_closed_email, send_campaign_report_to_admin
             transaction.on_commit(lambda: send_campaign_closed_email(campaign, reg_list))
+            transaction.on_commit(lambda: send_campaign_report_to_admin(campaign))
 
         return Response({"detail": "Campaign closed successfully."}, status=status.HTTP_200_OK)
 

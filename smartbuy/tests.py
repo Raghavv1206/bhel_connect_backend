@@ -778,12 +778,22 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check email
-        self.assertEqual(len(mail.outbox), 1)
-        email = mail.outbox[0]
-        self.assertIn("Closed Successfully", email.subject)
-        self.assertEqual(email.to, [self.buyer.email])
-        self.assertIn("50000.00", email.body) # final price
+        # Check emails: 1 to buyer, 1 to admin
+        self.assertEqual(len(mail.outbox), 2)
+        
+        # Verify buyer email
+        buyer_email = next(e for e in mail.outbox if self.buyer.email in e.to)
+        self.assertIn("Closed Successfully", buyer_email.subject)
+        self.assertEqual(buyer_email.to, [self.buyer.email])
+        self.assertIn("50000.00", buyer_email.body) # final price
+
+        # Verify admin email
+        admin_email = next(e for e in mail.outbox if self.admin_user.email in e.to)
+        self.assertIn("Bookings Report Ready", admin_email.subject)
+        self.assertEqual(admin_email.to, [self.admin_user.email])
+        self.assertEqual(len(admin_email.attachments), 1)
+        self.assertEqual(admin_email.attachments[0][0], f"campaign_{self.campaign.id}_bookings.xlsx")
+        self.assertEqual(admin_email.attachments[0][2], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
     def test_campaign_cancelled_sends_emails(self):
         # Register and approve buyer

@@ -10,7 +10,7 @@ from django.utils import timezone
 logger = logging.getLogger(__name__)
 
 
-def send_smartbuy_email_async(subject, text_template, html_template, context, recipient_list):
+def send_smartbuy_email_async(subject, text_template, html_template, context, recipient_list, attachments=None):
     """
     Renders email templates and dispatches the email using Django's EmailMultiAlternatives
     inside a background thread to prevent SMTP latency from blocking the main request thread.
@@ -30,6 +30,9 @@ def send_smartbuy_email_async(subject, text_template, html_template, context, re
             from_email = settings.DEFAULT_FROM_EMAIL
             msg = EmailMultiAlternatives(subject, text_content, from_email, recipient_list)
             msg.attach_alternative(html_content, "text/html")
+            if attachments:
+                for filename, content, mimetype in attachments:
+                    msg.attach(filename, content, mimetype)
             msg.send(fail_silently=False)
             logger.info(f"Successfully sent email '{subject}' to {recipient_list}")
         except Exception as err:
@@ -305,3 +308,53 @@ def send_campaign_cancelled_email(campaign, registrations):
             context=context,
             recipient_list=[employee.email]
         )
+
+
+def send_campaign_report_to_admin(campaign):
+    """Generates the campaign booking Excel sheet and emails it to the campaign's creator."""
+    if not campaign.created_by or not campaign.created_by.email:
+        logger.warning(f"Cannot send campaign close report: Campaign {campaign.id} has no creator or email.")
+        return
+
+    from reports.report_utils import generate_campaign_bookings_excel
+    
+    try:
+        # Generate the Excel byte string
+        excel_data = generate_campaign_bookings_excel(campaign)
+    except Exception as e:
+        logger.error(f"Failed to generate Excel report for campaign {campaign.id}: {e}", exc_info=True)
+        return
+
+    final_price = campaign.get_current_price()
+    confirmed_buyers_count = campaign.confirmed_buyers_count
+    waitlist_count = campaign.waitlisted_count
+    filename = f"campaign_{campaign.id}_bookings.xlsx"
+    frontend_url = get_frontend_url()
+
+    context = {
+        'admin_name': campaign.created_by.name,
+        'campaign': campaign,
+        'final_price': final_price,
+        'confirmed_buyers_count': confirmed_buyers_count,
+        'waitlist_count': waitlist_count,
+        'filename': filename,
+        'dashboard_link': f"{frontend_url}/admin/campaigns",
+        'subject': f"BHEL Connect - Campaign '{campaign.title}' Bookings Report Ready"
+    }
+
+    attachments = [
+        (
+            filename,
+            excel_data,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    ]
+
+    send_smartbuy_email_async(
+        subject=context['subject'],
+        text_template='emails/admin_campaign_report.txt',
+        html_template='emails/admin_campaign_report.html',
+        context=context,
+        recipient_list=[campaign.created_by.email],
+        attachments=attachments
+    )
