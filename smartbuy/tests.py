@@ -275,24 +275,25 @@ class SmartBuyCampaignTests(APITestCase):
             status="pending"
         )
 
-        # Admin rejects payment
+        # Admin attempts to reject payment (should fail since manual rejections are disabled)
         self.client.force_authenticate(user=self.admin_user)
         reject_url = reverse('admin_reject_payment', kwargs={'payment_id': payment.id})
         response = self.client.post(reject_url, {'rejection_reason': 'Invalid reference ID'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data['detail'], "Manual payment rejections have been disabled. All payments are automated via Cashfree.")
 
-        # Verify Buyer 1 is rejected
+        # Verify Buyer 1 status remains pending (not rejected)
         reg1.refresh_from_db()
-        self.assertEqual(reg1.payment_status, 'rejected')
+        self.assertEqual(reg1.payment_status, 'pending')
 
-        # Verify Campaign stock is still 0 (since the reclaimed slot was promoted to Buyer 2)
+        # Verify Campaign stock remains 0
         self.campaign.refresh_from_db()
         self.assertEqual(self.campaign.available_quantity, 0)
 
-        # Verify Buyer 2 is promoted
+        # Verify Buyer 2 remains waitlisted (not promoted)
         reg2.refresh_from_db()
-        self.assertFalse(reg2.is_waitlisted)
-        self.assertIsNotNone(reg2.slot_expiry_date)
+        self.assertTrue(reg2.is_waitlisted)
+        self.assertIsNone(reg2.slot_expiry_date)
 
 
 from unittest.mock import patch, MagicMock

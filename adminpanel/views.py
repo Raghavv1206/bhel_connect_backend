@@ -75,7 +75,7 @@ class AdminDashboardView(APIView):
             "active_listings": MarketplaceListing.objects.filter(status='available').count(),
             "pending_listings": MarketplaceListing.objects.filter(status='pending').count(),
             "total_users": Employee.objects.count(),
-            "pending_payment_approvals": TokenPayment.objects.filter(status='pending').count(),
+            "pending_payment_approvals": 0,  # Manual payment approvals are disabled
             "pending_refunds": CampaignRegistration.objects.filter(refund_status='pending').count(),
             "new_users_this_month": new_users_this_month,
             "recent_activity": recent_activity,
@@ -97,126 +97,40 @@ class PendingPaymentsView(APIView):
     permission_classes = [IsAdminEmployee]
 
     def get(self, request):
-        payments = (
-            TokenPayment.objects
-            .filter(status='pending')
-            .select_related('registration', 'registration__campaign', 'registration__employee')
-            .order_by('submitted_at')
-        )
-        serializer = TokenPaymentSerializer(payments, many=True, context={'request': request})
-        return Response(serializer.data, status=status.HTTP_200_OK)
+        # Manual payment approvals are disabled; all payments are automated via Cashfree
+        return Response([], status=status.HTTP_200_OK)
 
 
 class ApprovePaymentView(APIView):
     """
     POST: api/admin/payments/<int:payment_id>/approve/
-    Approves a token payment. Atomically updates payment + registration + sends notification.
+    Approves a token payment. Manual approvals are disabled.
 
     Access: IsAdminEmployee only.
     """
     permission_classes = [IsAdminEmployee]
 
     def post(self, request, payment_id):
-        with transaction.atomic():  # type: ignore
-            payment = get_object_or_404(TokenPayment.objects.select_for_update(), id=payment_id)
-            if payment.status != 'pending':
-                return Response(
-                    {"detail": "This payment has already been processed."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # Mark payment as approved
-            payment.status = 'approved'
-            payment.reviewed_by = request.user
-            payment.reviewed_at = timezone.now()
-            payment.save()
-
-            # Mark the corresponding registration as approved
-            registration = payment.registration
-            registration.payment_status = 'approved'
-            registration.payment_approved_by = request.user
-            registration.payment_approved_at = timezone.now()
-            registration.save()
-
-            # Invalidate dynamic pricing cache since buyer count changed
-            invalidate_campaign_price_cache(registration.campaign.id)
-
-            create_notification(
-                recipient=registration.employee,
-                title="Deposit Verified & Approved",
-                message=(
-                    f"Your token deposit of ₹{payment.amount:.2f} for campaign "
-                    f"'{registration.campaign.title}' has been verified and approved. "
-                    f"Your slot is confirmed!"
-                ),
-                notification_type="payment",
-                link=f"/smartbuy/{registration.campaign.id}",
-            )
-
-        return Response({"detail": "Payment approved successfully."}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": "Manual payment approvals have been disabled. All payments are automated via Cashfree."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 class RejectPaymentView(APIView):
     """
     POST: api/admin/payments/<int:payment_id>/reject/
-    Rejects a payment with a mandatory reason. Reclaims the campaign slot.
+    Rejects a payment. Manual rejections are disabled.
 
     Access: IsAdminEmployee only.
-    Request body: { "rejection_reason": "..." }
     """
     permission_classes = [IsAdminEmployee]
 
     def post(self, request, payment_id):
-        reason = (request.data.get('rejection_reason') or '').strip()
-        if not reason:
-            return Response(
-                {"detail": "rejection_reason is required to reject a payment."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        with transaction.atomic():  # type: ignore
-            payment = get_object_or_404(TokenPayment.objects.select_for_update(), id=payment_id)
-            if payment.status != 'pending':
-                return Response(
-                    {"detail": "This payment has already been processed."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            payment.status = 'rejected'
-            payment.rejection_reason = reason
-            payment.reviewed_by = request.user
-            payment.reviewed_at = timezone.now()
-            payment.save()
-
-            registration = payment.registration
-            # Lock campaign before registration to avoid deadlock
-            campaign = Campaign.objects.select_for_update().get(id=registration.campaign_id)
-            registration_db = CampaignRegistration.objects.select_for_update().get(id=registration.id)
-            registration_db.payment_status = 'rejected'
-            registration_db.save()
-
-            # Reclaim the slot that was reserved for this rejected registration
-            campaign.available_quantity += 1
-            campaign.save()
-            invalidate_campaign_price_cache(campaign.id)
-
-            # Promote next waitlist user into the freed slot
-            from smartbuy.utils import promote_from_waitlist
-            promote_from_waitlist(campaign.id)
-
-            create_notification(
-                recipient=registration_db.employee,
-                title="Deposit Rejected",
-                message=(
-                    f"Your token deposit of ₹{payment.amount:.2f} for campaign "
-                    f"'{campaign.title}' was rejected. Reason: {reason}. "
-                    f"Please re-upload a valid payment screenshot."
-                ),
-                notification_type="payment",
-                link=f"/smartbuy/{campaign.id}",
-            )
-
-        return Response({"detail": "Payment rejected successfully."}, status=status.HTTP_200_OK)
+        return Response(
+            {"detail": "Manual payment rejections have been disabled. All payments are automated via Cashfree."},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
 class PendingRefundsView(APIView):

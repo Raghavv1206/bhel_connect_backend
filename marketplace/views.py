@@ -21,7 +21,14 @@ class CategoryViewSet(viewsets.ModelViewSet):
     """
     queryset = Category.objects.all().order_by('display_order', 'name')
     serializer_class = CategorySerializer
-    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        """
+        Only allow authenticated users to view categories, and admins to manage them.
+        """
+        if self.action in ['list', 'retrieve']:
+            return [IsAuthenticated()]
+        return [IsAdminEmployee()]
 
 
 class MarketplaceListingPagination(PageNumberPagination):
@@ -47,7 +54,7 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
         """
         Dynamically resolve permission classes based on view actions.
         """
-        if self.action in ['update', 'partial_update']:
+        if self.action in ['update', 'partial_update', 'destroy']:
             return [IsAuthenticated(), IsOwnerOrAdmin()]
         return super().get_permissions()
 
