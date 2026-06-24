@@ -217,7 +217,7 @@ class ProcessRefundView(APIView):
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Required CSV column headers (order does not matter, checked by name)
-REQUIRED_CSV_COLUMNS = {'employee_id', 'name', 'email', 'mobile', 'department'}
+REQUIRED_CSV_COLUMNS = {'employee_id', 'name', 'email', 'mobile', 'department', 'password'}
 
 # Validation constraints matching the Employee model
 MAX_EMPLOYEE_ID_LEN = 20
@@ -238,6 +238,7 @@ def _validate_csv_row(row_num: int, row: dict) -> list[str]:
     email = (row.get('email') or '').strip().lower()
     mobile = (row.get('mobile') or '').strip()
     department = (row.get('department') or '').strip()
+    password = (row.get('password') or '').strip()
 
     # Check required fields are non-empty
     if not employee_id:
@@ -266,6 +267,11 @@ def _validate_csv_row(row_num: int, row: dict) -> list[str]:
         errors.append("department is missing or empty")
     elif len(department) > MAX_DEPARTMENT_LEN:
         errors.append(f"department exceeds {MAX_DEPARTMENT_LEN} characters")
+
+    if not password:
+        errors.append("password is missing or empty")
+    elif len(password) < 8:
+        errors.append("password must be at least 8 characters long")
 
     return errors
 
@@ -410,6 +416,7 @@ class BulkEmployeeImportView(APIView):
                 email = clean_row['email'].lower()
                 mobile = clean_row['mobile']
                 department = clean_row['department']
+                password = clean_row['password']
 
                 try:
                     employee, created = Employee.objects.get_or_create(
@@ -425,8 +432,8 @@ class BulkEmployeeImportView(APIView):
                     )
 
                     if created:
-                        # New employee — set an unusable password (OTP-only auth)
-                        employee.set_unusable_password()
+                        # New employee — set hashed password
+                        employee.set_password(password)
                         employee.save()
                         created_count += 1
                     else:
@@ -442,6 +449,12 @@ class BulkEmployeeImportView(APIView):
                         if employee.department != department:
                             employee.department = department
                             changed = True
+                        
+                        # Securely check and update password if changed
+                        if not employee.check_password(password):
+                            employee.set_password(password)
+                            changed = True
+
                         if changed:
                             employee.save()
                         updated_count += 1

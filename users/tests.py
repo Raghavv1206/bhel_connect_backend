@@ -354,3 +354,65 @@ class EmployeeManagementTests(APITestCase):
         self.client.force_authenticate(user=self.employee)
         response = self.client.patch(self.detail_url, {"is_active": False}, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_bulk_import_missing_password_column(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.admin)
+        url = reverse('admin_bulk_employee_import')
+        
+        # CSV missing the "password" header
+        csv_content = "employee_id,name,email,mobile,department\nEMP000003,John Doe,john.doe@bhel.in,9876543212,Finance\n"
+        csv_file = SimpleUploadedFile("employees.csv", csv_content.encode('utf-8'), content_type="text/csv")
+        
+        response = self.client.post(url, {'file': csv_file}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("missing required column(s)", response.data["detail"])
+        self.assertIn("password", response.data["detail"])
+
+    def test_bulk_import_validation_errors(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.admin)
+        url = reverse('admin_bulk_employee_import')
+        
+        # CSV with a password that is too short (less than 8 characters)
+        csv_content = "employee_id,name,email,mobile,department,password\nEMP000003,John Doe,john.doe@bhel.in,9876543212,Finance,short\n"
+        csv_file = SimpleUploadedFile("employees.csv", csv_content.encode('utf-8'), content_type="text/csv")
+        
+        response = self.client.post(url, {'file': csv_file}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["created"], 0)
+        self.assertEqual(response.data["skipped_errors"], 1)
+        self.assertIn("password must be at least 8 characters long", response.data["errors"][0]["reason"])
+
+    def test_bulk_import_success_and_password_hashing(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.admin)
+        url = reverse('admin_bulk_employee_import')
+        
+        # 1. Import a new employee with a valid password
+        csv_content = "employee_id,name,email,mobile,department,password\nEMP000003,John Doe,john.doe@bhel.in,9876543212,Finance,securepassword123\n"
+        csv_file = SimpleUploadedFile("employees.csv", csv_content.encode('utf-8'), content_type="text/csv")
+        
+        response = self.client.post(url, {'file': csv_file}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["created"], 1)
+        self.assertEqual(response.data["skipped_errors"], 0)
+        
+        # Verify the new employee has a securely hashed password
+        new_emp = Employee.objects.get(employee_id="EMP000003")
+        self.assertEqual(new_emp.name, "John Doe")
+        self.assertTrue(new_emp.check_password("securepassword123"))
+        self.assertFalse(new_emp.check_password("wrongpassword"))
+
+        # 2. Re-import the same employee with a updated password and details
+        csv_content_update = "employee_id,name,email,mobile,department,password\nEMP000003,John Doe,john.doe@bhel.in,9876543212,Finance,newsecurepassword456\n"
+        csv_file_update = SimpleUploadedFile("employees.csv", csv_content_update.encode('utf-8'), content_type="text/csv")
+        
+        response = self.client.post(url, {'file': csv_file_update}, format='multipart')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["updated"], 1)
+        
+        # Verify the password has been updated and hashed correctly
+        new_emp.refresh_from_db()
+        self.assertTrue(new_emp.check_password("newsecurepassword456"))
+        self.assertFalse(new_emp.check_password("securepassword123"))
