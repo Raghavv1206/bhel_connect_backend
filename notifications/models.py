@@ -75,3 +75,21 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.recipient.employee_id}: {self.title} ({'Read' if self.is_read else 'Unread'})"
+
+    def save(self, *args, **kwargs):
+        """
+        Enforce a maximum cap of 30 notifications per recipient on creation.
+        Deletes older notifications to prevent database bloat.
+        """
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        if is_new:
+            max_notifications = 30
+            # Retrieve the list of IDs of the 30 most recent notifications to keep
+            recent_ids = list(
+                Notification.objects.filter(recipient=self.recipient)
+                .order_by('-created_at')
+                .values_list('id', flat=True)[:max_notifications]
+            )
+            if recent_ids:
+                Notification.objects.filter(recipient=self.recipient).exclude(id__in=recent_ids).delete()

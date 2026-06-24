@@ -93,9 +93,10 @@ class MarkNotificationReadView(APIView):
     def patch(self, request, pk):
         try:
             notification = get_object_or_404(Notification, id=pk, recipient=request.user)
+            # Set in memory to return in the serialized response, but delete from DB
             notification.is_read = True
-            notification.save()
             serializer = NotificationSerializer(notification)
+            notification.delete()
             return Response(serializer.data, status=status.HTTP_200_OK)
         except Http404:
             return Response(
@@ -124,8 +125,8 @@ class MarkAllNotificationsReadView(APIView):
 
     def post(self, request):
         try:
-            Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
-            return Response({"detail": "All notifications marked as read."}, status=status.HTTP_200_OK)
+            Notification.objects.filter(recipient=request.user).delete()
+            return Response({"detail": "All notifications marked as read and cleared from database."}, status=status.HTTP_200_OK)
         except Exception as e:
             import logging
             logging.getLogger(__name__).error("Failed to update notifications: %s", e, exc_info=True)

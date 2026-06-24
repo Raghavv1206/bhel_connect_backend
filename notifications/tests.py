@@ -102,7 +102,7 @@ class NotificationAPITests(APITestCase):
 
     def test_mark_single_notification_read(self):
         """
-        Ensure single notification can be marked read by its recipient.
+        Ensure single notification can be marked read by its recipient (which deletes it from DB).
         """
         self.client.force_authenticate(user=self.user1)
         url = reverse("mark-notification-read", kwargs={"pk": self.notif1.id})
@@ -110,9 +110,9 @@ class NotificationAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data["is_read"])
         
-        # Re-fetch from DB
-        self.notif1.refresh_from_db()
-        self.assertTrue(self.notif1.is_read)
+        # Verify it has been deleted from the database
+        self.assertFalse(Notification.objects.filter(id=self.notif1.id).exists())
+
 
     def test_mark_single_notification_read_forbidden(self):
         """
@@ -212,3 +212,40 @@ class NotificationTransactionSafetyTests(TransactionTestCase):
             self.assertEqual(Notification.objects.filter(recipient=self.user).count(), 0)
 
         self.assertEqual(Notification.objects.filter(recipient=self.user).count(), 3)
+
+    def test_notification_cap_single_creation(self):
+        """
+        Ensure that creating more than 30 notifications via standard save cap at 30.
+        """
+        # Create 35 notifications for self.user
+        for i in range(35):
+            Notification.objects.create(
+                recipient=self.user,
+                title=f"Notification {i}",
+                message=f"Message {i}",
+                notification_type="system"
+            )
+        # Verify only 30 remain in the database for self.user
+        self.assertEqual(Notification.objects.filter(recipient=self.user).count(), 30)
+
+    def test_notification_cap_bulk_creation(self):
+        """
+        Ensure that bulk creating notifications also caps at 30 per user.
+        """
+        # Bulk create 40 notifications for self.user inside a transaction
+        with transaction.atomic():
+            notifs = [
+                Notification(
+                    recipient=self.user,
+                    title=f"Bulk {i}",
+                    message=f"Detail {i}",
+                    notification_type="system"
+                )
+                for i in range(40)
+            ]
+            create_notifications_bulk(notifs)
+            # Within the transaction, it shouldn't exist in the database yet
+            self.assertEqual(Notification.objects.filter(recipient=self.user).count(), 0)
+
+        # After commit, only 30 should remain
+        self.assertEqual(Notification.objects.filter(recipient=self.user).count(), 30)

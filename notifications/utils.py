@@ -43,7 +43,19 @@ def create_notifications_bulk(notifications_list):
         try:
             # Only bulk create if the list is not empty
             if notifications_list:
-                return Notification.objects.bulk_create(notifications_list)
+                created = Notification.objects.bulk_create(notifications_list)
+                # Enforce notification cap per recipient
+                recipients = {n.recipient for n in notifications_list if n.recipient}
+                max_notifications = 30
+                for recipient in recipients:
+                    recent_ids = list(
+                        Notification.objects.filter(recipient=recipient)
+                        .order_by('-created_at')
+                        .values_list('id', flat=True)[:max_notifications]
+                    )
+                    if recent_ids:
+                        Notification.objects.filter(recipient=recipient).exclude(id__in=recent_ids).delete()
+                return created
         except Exception as e:
             logger.error(f"Failed to bulk create notifications: {e}", exc_info=True)
             return []
