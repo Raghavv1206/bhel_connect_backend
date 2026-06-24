@@ -281,6 +281,23 @@ else:
     }
 
 
+# Cache Configuration (Ensures production rate limits are synchronized using Redis)
+if use_redis:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+            'LOCATION': redis_url,
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'bhel_connect_cache',
+        }
+    }
+
+
 # Security Headers for Production Compliance
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True

@@ -27,7 +27,8 @@ class AuthenticationTests(APITestCase):
             name="Ramesh Kumar",
             email="ramesh.kumar@bhel.in",
             department="Electrical Engineering",
-            mobile="9876543211"
+            mobile="9876543211",
+            password="testpassword"
         )
         self.admin = Employee.objects.create_user(
             employee_id="EMP000001",
@@ -35,12 +36,14 @@ class AuthenticationTests(APITestCase):
             email="admin@bhel.in",
             department="Information Technology",
             mobile="9876543210",
-            is_admin=True
+            is_admin=True,
+            password="testpassword"
         )
         
-        # Test URLs
         self.request_otp_url = reverse('request_otp')
         self.verify_otp_url = reverse('verify_otp')
+        self.login_password_url = reverse('login_password')
+        self.employee_count_url = reverse('employee_count')
         self.logout_url = reverse('logout')
         self.profile_url = reverse('user_profile')
 
@@ -198,6 +201,91 @@ class AuthenticationTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Department remains unchanged
         self.assertEqual(response.data["department"], "Electrical Engineering")
+
+    def test_login_password_success(self):
+        """Test successful login via employee ID and password."""
+        payload = {
+            "employee_id": "EMP000002",
+            "password": "testpassword"
+        }
+        response = self.client.post(self.login_password_url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("access", response.data)
+        self.assertIn("refresh", response.data)
+
+        # Verify claims in JWT token
+        access_token = AccessToken(response.data["access"])
+        self.assertEqual(access_token["name"], "Ramesh Kumar")
+        self.assertEqual(access_token["is_admin"], False)
+
+    def test_login_password_invalid_password(self):
+        """Test password login fails with incorrect password."""
+        payload = {
+            "employee_id": "EMP000002",
+            "password": "wrongpassword"
+        }
+        response = self.client.post(self.login_password_url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Invalid Employee ID or password.")
+
+    def test_login_password_invalid_employee(self):
+        """Test password login fails for non-existent employee ID."""
+        payload = {
+            "employee_id": "NONEXISTENT",
+            "password": "testpassword"
+        }
+        response = self.client.post(self.login_password_url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Invalid Employee ID or password.")
+
+    def test_login_password_deactivated_account(self):
+        """Test password login is rejected for deactivated employee."""
+        self.employee.is_active = False
+        self.employee.save()
+
+        payload = {
+            "employee_id": "EMP000002",
+            "password": "testpassword"
+        }
+        response = self.client.post(self.login_password_url, payload, format='json')
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "This account is deactivated. Please contact an administrator.")
+
+    def test_login_password_rate_limiting(self):
+        """Test that password login requests are blocked after 5 requests in an hour."""
+        payload = {
+            "employee_id": "EMP000002",
+            "password": "wrongpassword"
+        }
+        
+        # Send 5 requests
+        for _ in range(5):
+            response = self.client.post(self.login_password_url, payload, format='json')
+            # Should fail with invalid credentials but NOT rate-limited yet
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+            self.assertEqual(response.data["detail"], "Invalid Employee ID or password.")
+        # 6th request should fail due to rate limit
+        response = self.client.post(self.login_password_url, payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
+        self.assertEqual(response.data["detail"], "Too many login attempts. Please wait and try again after some time.")
+
+    def test_employee_count_authenticated(self):
+        """Test fetching employee count as an authenticated employee."""
+        self.client.force_authenticate(user=self.employee)
+        response = self.client.get(self.employee_count_url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        # We seeded 2 employees in setUp (self.employee and self.admin)
+        self.assertEqual(response.data["count"], 2)
+
+    def test_employee_count_unauthenticated(self):
+        """Test fetching employee count without authentication is rejected."""
+        response = self.client.get(self.employee_count_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
 
 
 class EmployeeManagementTests(APITestCase):

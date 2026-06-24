@@ -141,3 +141,15 @@ class SavedProductSerializer(serializers.ModelSerializer):
         ).data
         return representation
 
+
+class PasswordLoginSerializer(serializers.Serializer):
+    """
+    Validates payload for logging in via employee ID and password.
+    """
+    employee_id = serializers.CharField(max_length=20, required=True)
+    password = serializers.CharField(required=True, write_only=True)
+
+    def validate_employee_id(self, value):
+        """Ensure employee ID is clean."""
+        return value.strip()
+

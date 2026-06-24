@@ -13,7 +13,7 @@ from django_ratelimit.decorators import ratelimit
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Employee, OTPVerification
-from .serializers import EmployeeSerializer, OTPRequestSerializer, OTPVerifySerializer
+from .serializers import EmployeeSerializer, OTPRequestSerializer, OTPVerifySerializer, PasswordLoginSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +214,71 @@ class VerifyOTPView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+class LoginWithPasswordView(APIView):
+    """
+    POST: api/auth/login-password/
+    Logs in the employee via their Employee ID and password.
+    If credentials are valid and account is active, returns JWT access + refresh tokens.
+    Rate Limiting: Max 5 requests per hour per employee ID.
+    """
+    permission_classes = []  # Public endpoint
+
+    @method_decorator(ratelimit(key=employee_id_key, rate='5/h', block=False))
+    def post(self, request):
+        # Check if rate limit was exceeded
+        was_limited = getattr(request, 'limited', False)
+        if was_limited:
+            logger.warning(f"Password login rate-limited for key: {employee_id_key(None, request)}")
+            return Response(
+                {"detail": "Too many login attempts. Please wait and try again after some time."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
+        serializer = PasswordLoginSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        employee_id = serializer.validated_data['employee_id']
+        password = serializer.validated_data['password']
+
+        try:
+            employee = Employee.objects.get(employee_id=employee_id)
+        except Employee.DoesNotExist:
+            employee = None
+
+        if employee:
+            password_correct = employee.check_password(password)
+        else:
+            # Prevent timing attacks (user enumeration) by running a dummy password hashing check
+            dummy = Employee()
+            dummy.set_password(password)
+            password_correct = False
+
+        if not employee or not password_correct:
+            return Response(
+                {"detail": "Invalid Employee ID or password."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if not employee.is_active:
+            return Response(
+                {"detail": "This account is deactivated. Please contact an administrator."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Generate JWT tokens with custom payload claims (for frontend decoding)
+        refresh = RefreshToken.for_user(employee)
+        
+        # Inject custom claims
+        refresh['name'] = employee.name
+        refresh['is_admin'] = employee.is_admin
+
+        return Response({
+            "access": str(refresh.access_token),
+            "refresh": str(refresh)
+        }, status=status.HTTP_200_OK)
+
+
 class LogoutView(APIView):
     """
     POST: api/auth/logout/
@@ -242,6 +307,19 @@ class LogoutView(APIView):
                 {"detail": "Invalid or already blacklisted refresh token."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+
+class EmployeeCountView(APIView):
+    """
+    GET: api/users/count/
+    Returns the total count of registered employees.
+    Requires authentication.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        count = Employee.objects.count()
+        return Response({"count": count}, status=status.HTTP_200_OK)
 
 
 class ProfileView(APIView):
@@ -418,10 +496,13 @@ class EmployeeListView(APIView):
         search = request.query_params.get('search', '').strip()
         if search:
             queryset = queryset.filter(
-                Q(employee_id__icontains=search) |
-                Q(name__icontains=search) |
-                Q(email__icontains=search) |
-                Q(department__icontains=search)
+                Q(
+                    Q(employee_id__icontains=search),
+                    Q(name__icontains=search),
+                    Q(email__icontains=search),
+                    Q(department__icontains=search),
+                    _connector=Q.OR
+                )
             )
             
         paginator = EmployeePagination()
