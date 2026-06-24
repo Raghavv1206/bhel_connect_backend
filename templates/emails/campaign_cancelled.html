@@ -8,7 +8,7 @@
 <div class="alert-warning">
     <strong>Campaign Cancelled:</strong>
     {% if reg_status == "approved" %}
-        A full refund of your 10% token deposit (<strong>₹{{ token_amount|floatformat:2 }}</strong>) has been initiated and will be credited to your original payment method in 5-7 working days.
+        A full refund of your token deposit (<strong>₹{{ token_amount|floatformat:2 }}</strong>) has been initiated and will be credited to your original payment method in 5-7 working days.
     {% else %}
         Your pending registration has been voided. No payment was captured, so no refund is necessary.
     {% endif %}

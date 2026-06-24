@@ -1,3 +1,4 @@
+from decimal import Decimal
 from rest_framework import serializers
 from .models import Vendor, Campaign, PricingTier, CampaignRegistration, TokenPayment
 
@@ -40,7 +41,7 @@ class CampaignSerializer(serializers.ModelSerializer):
             'total_quantity', 'available_quantity', 'duration_days', 'start_date', 
             'end_date', 'status', 'upi_qr_image', 'created_by', 'created_at', 
             'pricing_tiers', 'current_price', 'confirmed_buyers_count', 'is_sold_out',
-            'time_remaining_seconds', 'user_registration'
+            'time_remaining_seconds', 'user_registration', 'token_deposit', 'cancellation_refund_amount'
         ]
         read_only_fields = ['id', 'end_date', 'created_by', 'created_at', 'available_quantity']
 
@@ -81,7 +82,19 @@ class CampaignSerializer(serializers.ModelSerializer):
         Validate Campaign attributes and Pricing Tiers constraints:
         1. End date calculation check.
         2. Pricing tiers must exist and be contiguous and non-overlapping.
+        3. Token deposit and cancellation refund amount must be valid.
         """
+        # Validate token deposit and cancellation refund amount
+        token_deposit = attrs.get('token_deposit', Decimal('0.00'))
+        cancellation_refund_amount = attrs.get('cancellation_refund_amount', Decimal('0.00'))
+
+        if token_deposit < 0:
+            raise serializers.ValidationError({"token_deposit": "Token deposit must be a non-negative number."})
+        if cancellation_refund_amount < 0:
+            raise serializers.ValidationError({"cancellation_refund_amount": "Cancellation refund amount must be a non-negative number."})
+        if cancellation_refund_amount > token_deposit:
+            raise serializers.ValidationError({"cancellation_refund_amount": "Cancellation refund amount cannot exceed the token deposit amount."})
+
         # Read the pricing tiers from initial data
         pricing_tiers_data = self.initial_data.get('pricing_tiers', [])
         if not pricing_tiers_data:
@@ -160,11 +173,14 @@ class CampaignRegistrationSerializer(serializers.ModelSerializer):
     campaign_title = serializers.CharField(source='campaign.title', read_only=True)
     campaign_status = serializers.CharField(source='campaign.status', read_only=True)
     campaign_end_date = serializers.DateTimeField(source='campaign.end_date', read_only=True)
+    campaign_token_deposit = serializers.DecimalField(source='campaign.token_deposit', read_only=True, max_digits=10, decimal_places=2)
+    campaign_cancellation_refund_amount = serializers.DecimalField(source='campaign.cancellation_refund_amount', read_only=True, max_digits=10, decimal_places=2)
 
     class Meta:
         model = CampaignRegistration
         fields = [
             'id', 'campaign', 'campaign_title', 'campaign_status', 'campaign_end_date',
+            'campaign_token_deposit', 'campaign_cancellation_refund_amount',
             'employee', 'employee_id', 'employee_name', 
             'reservation_date', 'token_amount', 'payment_status', 'upi_screenshot', 
             'cashfree_order_id', 'cashfree_payment_id', 'payment_approved_by', 

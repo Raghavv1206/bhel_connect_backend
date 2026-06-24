@@ -1,3 +1,4 @@
+from decimal import Decimal
 from datetime import timedelta
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -64,7 +65,9 @@ class SmartBuyCampaignTests(APITestCase):
             duration_days=7,
             start_date=timezone.now() - timedelta(days=1), # Started yesterday
             status="active",
-            created_by=self.admin_user
+            created_by=self.admin_user,
+            token_deposit=Decimal('5000.00'),
+            cancellation_refund_amount=Decimal('2500.00')
         )
 
         # Create Pricing Tiers
@@ -295,6 +298,52 @@ class SmartBuyCampaignTests(APITestCase):
         self.assertTrue(reg2.is_waitlisted)
         self.assertIsNone(reg2.slot_expiry_date)
 
+    def test_zero_deposit_campaign_bypasses_payment_gateway(self):
+        """
+        Test that a campaign with a token deposit of 0.00:
+        1. Confirms the user's registration immediately as approved.
+        2. Bypasses the Cashfree payment gateway order creation.
+        3. Can be cancelled by the user immediately with refund_status='not_applicable' and 0 refund.
+        """
+        # Create a new campaign with 0 deposit
+        zero_campaign = Campaign.objects.create(
+            title="Free Campaign",
+            description="No deposit laptop",
+            vendor=self.vendor,
+            total_quantity=5,
+            available_quantity=5,
+            duration_days=7,
+            start_date=timezone.now() - timedelta(days=1),
+            status="active",
+            created_by=self.admin_user,
+            token_deposit=Decimal('0.00'),
+            cancellation_refund_amount=Decimal('0.00')
+        )
+        PricingTier.objects.create(campaign=zero_campaign, min_buyers=1, max_buyers=None, price=40000)
+
+        # Register for 0-deposit campaign
+        self.client.force_authenticate(user=self.buyer1)
+        url = reverse('campaign-create-order', kwargs={'pk': zero_campaign.id})
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data['payment_required'], False)
+        self.assertEqual(response.data['payment_status'], 'approved')
+
+        # Check registration database record
+        reg = CampaignRegistration.objects.get(campaign=zero_campaign, employee=self.buyer1)
+        self.assertEqual(reg.payment_status, 'approved')
+        self.assertEqual(reg.token_amount, Decimal('0.00'))
+
+        # Cancel the 0-deposit registration
+        cancel_url = reverse('campaign_cancel_registration', kwargs={'id': zero_campaign.id})
+        cancel_response = self.client.post(cancel_url)
+        self.assertEqual(cancel_response.status_code, status.HTTP_200_OK)
+        self.assertEqual(float(cancel_response.data['refund_amount']), 0.0)
+        self.assertEqual(cancel_response.data['refund_status'], 'not_applicable')
+
+        reg.refresh_from_db()
+        self.assertEqual(reg.payment_status, 'cancelled')
+
 
 from unittest.mock import patch, MagicMock
 
@@ -336,7 +385,9 @@ class CashfreePaymentGatewayTests(APITestCase):
             duration_days=7,
             start_date=timezone.now() - timedelta(days=1),
             status="active",
-            created_by=self.admin_user
+            created_by=self.admin_user,
+            token_deposit=Decimal('1000.00'),
+            cancellation_refund_amount=Decimal('500.00')
         )
         self.tier = PricingTier.objects.create(campaign=self.campaign, min_buyers=1, max_buyers=None, price=10000)
 
@@ -582,7 +633,9 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
             duration_days=7,
             start_date=timezone.now() - timedelta(days=1),
             status="active",
-            created_by=self.admin_user
+            created_by=self.admin_user,
+            token_deposit=Decimal('4500.00'),
+            cancellation_refund_amount=Decimal('2250.00')
         )
         self.tier1 = PricingTier.objects.create(campaign=self.campaign, min_buyers=1, max_buyers=1, price=50000)
         self.tier2 = PricingTier.objects.create(campaign=self.campaign, min_buyers=2, max_buyers=None, price=45000)

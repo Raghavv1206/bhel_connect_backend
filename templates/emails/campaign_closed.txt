@@ -5,7 +5,7 @@ Congratulations! The campaign "{{ campaign.title }}" you participated in has clo
 Campaign Summary:
 - Campaign: {{ campaign.title }}
 - Final Unit Price: ₹{{ final_price|floatformat:2 }}
-- Token Deposit Paid (10%): ₹{{ token_amount|floatformat:2 }}
+- Token Deposit Paid: ₹{{ token_amount|floatformat:2 }}
 - Remaining Balance Due: ₹{{ balance_due|floatformat:2 }}
 - Total Confirmed Buyers: {{ confirmed_buyers_count }}
 

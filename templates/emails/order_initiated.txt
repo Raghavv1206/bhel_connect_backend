@@ -2,7 +2,7 @@ Hello {{ user.name }},
 
 You have initiated registration to join the group buying campaign "{{ campaign.title }}". 
 
-To secure your slot in this campaign, you must complete the 10% token deposit payment of ₹{{ amount|floatformat:2 }}.
+To secure your slot in this campaign, you must complete the token deposit payment of ₹{{ amount|floatformat:2 }}.
 
 Order Details:
 - Campaign: {{ campaign.title }}

@@ -258,7 +258,9 @@ class CampaignViewSet(viewsets.ModelViewSet):
                 start_date=start_date,
                 status='active',
                 upi_qr_image=campaign.upi_qr_image,
-                created_by=request.user
+                created_by=request.user,
+                token_deposit=campaign.token_deposit,
+                cancellation_refund_amount=campaign.cancellation_refund_amount
             )
 
             # Copy pricing tiers
@@ -318,9 +320,7 @@ class CampaignViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST
                     )
 
-                lowest_tier = campaign.pricing_tiers.order_by('price').first()
-                base_price = lowest_tier.price if lowest_tier else Decimal('0.00')
-                token_amount = (base_price * Decimal('0.10')).quantize(Decimal('0.01'))
+                token_amount = campaign.token_deposit
 
                 campaign.available_quantity -= 1
                 campaign.save()
@@ -343,6 +343,30 @@ class CampaignViewSet(viewsets.ModelViewSet):
             timestamp = int(timezone.now().timestamp())
             order_id = f"BHEL_{campaign.id}_{request.user.employee_id}_{timestamp}"
             token_amount = registration.token_amount
+
+            if token_amount == 0:
+                # Bypassing payment gateway for 0-deposit campaigns
+                if registration.payment_status != 'approved':
+                    registration.payment_status = 'approved'
+                    registration.payment_approved_at = timezone.now()
+                    registration.save()
+
+                    # Notify and email user immediately
+                    create_notification(
+                        recipient=request.user,
+                        title="Booking Confirmed",
+                        message=f"Your booking slot in Campaign '{campaign.title}' is confirmed.",
+                        notification_type="campaign",
+                        link=f"/smartbuy/{campaign.id}"
+                    )
+                    from .emails import send_payment_confirmed_email
+                    transaction.on_commit(lambda: send_payment_confirmed_email(registration))
+
+                return Response({
+                    "payment_required": False,
+                    "payment_status": "approved",
+                    "detail": "Registration confirmed. No payment deposit required."
+                }, status=status.HTTP_201_CREATED)
 
             cf = CashfreeService()
             frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
@@ -532,13 +556,13 @@ class CancelRegistrationView(APIView):
 
                 # Calculate refund based on campaign status/timing
                 if campaign.status == 'active' and campaign.end_date > timezone.now():
-                    # 50% refund, 50% penalty
-                    refund_amount = token_amount * Decimal('0.50')
+                    # Refund the custom cancellation amount, capped at the paid token amount
+                    refund_amount = min(campaign.cancellation_refund_amount, token_amount)
                     if has_token_payment(registration) and registration.token_payment.status == 'approved':
                         refund_status = 'pending'
                 else:
                     # After closure: 0% refund
-                    refund_amount = 0
+                    refund_amount = Decimal('0.00')
 
                 # Promote next user from waitlist
                 promote_from_waitlist(campaign.id)

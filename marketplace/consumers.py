@@ -82,7 +82,7 @@ def save_chat_message(listing_id, sender, receiver, message_text):
         title="New Chat Message",
         message=f"{sender.name} sent you a message about '{listing.title}'",
         notification_type="chat",
-        link=f"/marketplace/{listing.id}"
+        link=f"/profile?tab=chats&listingId={listing.id}&otherUserId={sender.employee_id}"
     )
     return msg
 

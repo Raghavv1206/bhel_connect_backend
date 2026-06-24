@@ -180,10 +180,8 @@ def send_waitlist_promoted_email(registration):
     campaign = registration.campaign
     employee = registration.employee
 
-    # Determine token amount based on campaign pricing tiers
-    lowest_tier = campaign.pricing_tiers.order_by('price').first()
-    base_price = lowest_tier.price if lowest_tier else Decimal('0.00')
-    token_amount = (base_price * Decimal('0.10')).quantize(Decimal('0.01'))
+    # Determine token amount from registration (falls back to campaign deposit)
+    token_amount = registration.token_amount or campaign.token_deposit
 
     context = {
         'user': employee,

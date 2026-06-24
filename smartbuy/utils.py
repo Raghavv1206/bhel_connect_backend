@@ -204,6 +204,7 @@ def promote_from_waitlist(campaign_id):
             next_in_line.is_waitlisted = False
             next_in_line.waitlist_position = None
             next_in_line.slot_expiry_date = timezone.now() + timedelta(hours=24)
+            next_in_line.token_amount = campaign.token_deposit
             next_in_line.save()
 
             # Shift other waitlist users' positions up by 1 using optimized single UPDATE query

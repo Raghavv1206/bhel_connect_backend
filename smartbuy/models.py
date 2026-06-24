@@ -151,6 +151,24 @@ class Campaign(models.Model):
         help_text='UPI QR code image for manual payment fallback'
     )
 
+    # Custom token deposit amount required to join this campaign
+    token_deposit = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Custom token deposit amount required to join this campaign'
+    )
+
+    # Custom refund amount returned to the employee upon cancellation
+    cancellation_refund_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Custom refund amount returned to the employee upon cancellation during active phase'
+    )
+
     # Admin who created this campaign — PROTECT prevents accidental admin deletion
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -352,12 +370,12 @@ class CampaignRegistration(models.Model):
         help_text='When the employee registered'
     )
 
-    # Token amount paid/to be paid (10% of price at time of registration)
+    # Token amount paid/to be paid (matches the custom campaign token deposit)
     token_amount = models.DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0,
-        help_text='Token amount (10%% of price at registration time) — immutable once set'
+        help_text='Token amount paid/to be paid for this registration — immutable once set'
     )
 
     # Current payment status

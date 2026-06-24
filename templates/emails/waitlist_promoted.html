@@ -6,7 +6,7 @@
 <p>Great news! A slot has opened up in the campaign <strong>"{{ campaign.title }}"</strong> and you have been promoted from the waitlist to a reserved booking slot.</p>
 
 <div class="alert-warning">
-    <strong>24-Hour Payment Deadline:</strong> You must complete your token deposit payment of 10% within 24 hours (before <strong>{{ expiry_date|date:"Y-m-d H:i:s" }}</strong>) to secure this slot. If payment is not verified by this time, your slot will expire and be offered to the next employee in line.
+    <strong>24-Hour Payment Deadline:</strong> You must complete your token deposit payment within 24 hours (before <strong>{{ expiry_date|date:"Y-m-d H:i:s" }}</strong>) to secure this slot. If payment is not verified by this time, your slot will expire and be offered to the next employee in line.
 </div>
 
 <table class="detail-table">
@@ -21,7 +21,7 @@
             <td>{{ campaign.title }}</td>
         </tr>
         <tr>
-            <td><strong>Token Deposit (10%)</strong></td>
+            <td><strong>Token Deposit</strong></td>
             <td class="highlight-row">₹{{ amount|floatformat:2 }}</td>
         </tr>
         <tr>
