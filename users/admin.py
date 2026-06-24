@@ -2,8 +2,11 @@ import csv
 import io
 import re
 import logging
+from django import forms
 from django.contrib import admin
 from django.contrib import messages
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm
 from django.urls import path
 from django.shortcuts import render, redirect
 from django.db import transaction
@@ -68,17 +71,47 @@ def _validate_csv_row(row_num: int, row: dict) -> list[str]:
     return errors
 
 
+class EmployeeCreationForm(UserCreationForm):
+    class Meta:
+        model = Employee
+        fields = ('employee_id', 'name', 'email', 'mobile', 'department')
+
+class EmployeeChangeForm(UserChangeForm):
+    class Meta:
+        model = Employee
+        fields = '__all__'
+
 @admin.register(Employee, site=admin_site)
-class EmployeeAdmin(admin.ModelAdmin):
+class EmployeeAdmin(BaseUserAdmin):
     """
     Admin layout for managing BHEL Employees.
     Provides filtering by status/dept and search by ID/Name/Email.
     Includes custom Bulk CSV Employee Import functionality.
+    Inherits from BaseUserAdmin to support secure password hashing and management.
     """
+    form = EmployeeChangeForm
+    add_form = EmployeeCreationForm
+
     list_display = ('employee_id', 'name', 'email', 'department', 'is_active', 'is_admin', 'date_joined')
     list_filter = ('is_active', 'is_admin', 'department')
     search_fields = ('employee_id', 'name', 'email')
     ordering = ('employee_id',)
+
+    fieldsets = (
+        (None, {'fields': ('employee_id', 'password')}),
+        ('Personal Info', {'fields': ('name', 'email', 'mobile', 'department', 'profile_picture')}),
+        ('Permissions', {'fields': ('is_active', 'is_admin')}),
+    )
+
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('employee_id', 'name', 'email', 'mobile', 'department', 'password1', 'password2'),
+        }),
+    )
+
+    filter_horizontal = ()
+    filter_vertical = ()
 
     def get_urls(self):
         urls = super().get_urls()
