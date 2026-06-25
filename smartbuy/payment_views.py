@@ -29,43 +29,52 @@ class CashfreeVerifyView(APIView):
         return (renderers[0], renderers[0].media_type)
 
     def get(self, request, order_id):
-        # Fetch TokenPayment from DB
-        token_payment = get_object_or_404(
-            TokenPayment.objects.select_related('registration', 'registration__campaign', 'registration__employee'),
-            cashfree_order_id=order_id
-        )
-
-        # Enforce that only the recipient employee or admin can verify their own payment
-        if token_payment.registration.employee != request.user and not request.user.is_admin:
-            return Response(
-                {"detail": "You do not have permission to verify this transaction."},
-                status=status.HTTP_403_FORBIDDEN
+        # Enforce that the verification is wrapped in a transaction and locks the payment row
+        with transaction.atomic():  # type: ignore
+            # Lock the TokenPayment row to prevent concurrent manual verification / webhook updates
+            token_payment = (
+                TokenPayment.objects
+                .select_for_update()
+                .select_related('registration', 'registration__campaign', 'registration__employee')
+                .filter(cashfree_order_id=order_id)
+                .first()
             )
 
-        # Skip API call if already approved
-        if token_payment.status == 'approved':
-            return Response({
-                "status": "PAID",
-                "detail": "Payment already verified and approved.",
-                "campaign_id": token_payment.registration.campaign.id
-            }, status=status.HTTP_200_OK)
+            if not token_payment:
+                return Response(
+                    {"detail": "Transaction not found."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
 
-        # Skip API call and return status if already rejected/cancelled
-        if token_payment.status == 'rejected' or token_payment.registration.payment_status == 'cancelled':
-            return Response({
-                "status": "FAILED",
-                "detail": "This transaction has been cancelled or rejected.",
-                "campaign_id": token_payment.registration.campaign.id
-            }, status=status.HTTP_200_OK)
+            # Enforce that only the recipient employee or admin can verify their own payment
+            if token_payment.registration.employee != request.user and not request.user.is_admin:
+                return Response(
+                    {"detail": "You do not have permission to verify this transaction."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
 
-        cf = CashfreeService()
-        try:
-            cf_order = cf.fetch_cashfree_order(order_id)
-            cf_status = cf_order.order_status  # PAID, ACTIVE, EXPIRED, etc.
-            
-            if cf_status == "PAID":
-                # Atomically update DB records
-                with transaction.atomic():  # type: ignore
+            # Skip API call if already approved
+            if token_payment.status == 'approved':
+                return Response({
+                    "status": "PAID",
+                    "detail": "Payment already verified and approved.",
+                    "campaign_id": token_payment.registration.campaign.id
+                }, status=status.HTTP_200_OK)
+
+            # Skip API call and return status if already rejected/cancelled
+            if token_payment.status == 'rejected' or token_payment.registration.payment_status == 'cancelled':
+                return Response({
+                    "status": "FAILED",
+                    "detail": "This transaction has been cancelled or rejected.",
+                    "campaign_id": token_payment.registration.campaign.id
+                }, status=status.HTTP_200_OK)
+
+            cf = CashfreeService()
+            try:
+                cf_order = cf.fetch_cashfree_order(order_id)
+                cf_status = cf_order.order_status  # PAID, ACTIVE, EXPIRED, etc.
+                
+                if cf_status == "PAID":
                     token_payment.status = 'approved'
                     # Retrieve the actual transaction payment ID from Cashfree order details
                     payments_data = cf.client.PGOrderFetchPayments(order_id, None, None)
@@ -77,36 +86,36 @@ class CashfreeVerifyView(APIView):
                     reg.payment_status = 'approved'
                     reg.save()
 
-                # Notify user outside transaction to prevent rollbacks
-                create_notification(
-                    recipient=reg.employee,
-                    title="Payment Confirmed",
-                    message=f"Payment confirmed for campaign '{reg.campaign.title}'. Slot reserved!",
-                    notification_type="payment",
-                    link=f"/smartbuy/{reg.campaign.id}"
+                    # Notify user and email only AFTER successful transaction commit
+                    transaction.on_commit(lambda: create_notification(
+                        recipient=reg.employee,
+                        title="Payment Confirmed",
+                        message=f"Payment confirmed for campaign '{reg.campaign.title}'. Slot reserved!",
+                        notification_type="payment",
+                        link=f"/smartbuy/{reg.campaign.id}"
+                    ))
+
+                    from .emails import send_payment_confirmed_email
+                    transaction.on_commit(lambda: send_payment_confirmed_email(reg))
+
+                    return Response({
+                        "status": "PAID",
+                        "detail": "Payment verified and approved successfully.",
+                        "campaign_id": reg.campaign.id
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "status": cf_status,
+                        "detail": f"Payment is in status: {cf_status}",
+                        "campaign_id": token_payment.registration.campaign.id
+                    }, status=status.HTTP_200_OK)
+
+            except Exception as e:
+                logger.error(f"Failed to fetch order status from Cashfree for {order_id}: {e}", exc_info=True)
+                return Response(
+                    {"detail": f"Error communicating with Cashfree Payment Gateway: {str(e)}", "campaign_id": token_payment.registration.campaign.id},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
-
-                from .emails import send_payment_confirmed_email
-                send_payment_confirmed_email(reg)
-
-                return Response({
-                    "status": "PAID",
-                    "detail": "Payment verified and approved successfully.",
-                    "campaign_id": reg.campaign.id
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    "status": cf_status,
-                    "detail": f"Payment is in status: {cf_status}",
-                    "campaign_id": token_payment.registration.campaign.id
-                }, status=status.HTTP_200_OK)
-
-        except Exception as e:
-            logger.error(f"Failed to fetch order status from Cashfree for {order_id}: {e}", exc_info=True)
-            return Response(
-                {"detail": f"Error communicating with Cashfree Payment Gateway: {str(e)}", "campaign_id": token_payment.registration.campaign.id},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 
 class CashfreeWebhookView(APIView):

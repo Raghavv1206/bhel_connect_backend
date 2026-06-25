@@ -67,7 +67,19 @@ class CampaignSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         if not request or not request.user or not request.user.is_authenticated:
             return None
-        registration = obj.registrations.filter(employee=request.user).exclude(payment_status__in=['cancelled', 'rejected']).first()
+            
+        # Optimize: check if user active registrations were prefetched to avoid N+1 queries
+        if hasattr(obj, 'user_active_registrations'):
+            active_regs = obj.user_active_registrations
+            registration = active_regs[0] if active_regs else None
+        else:
+            # Fallback if queryset was not prefetched (e.g. in non-ViewSet contexts)
+            registration = obj.registrations.filter(
+                employee=request.user
+            ).exclude(
+                payment_status__in=['cancelled', 'rejected']
+            ).first()
+
         if not registration:
             return None
         return {

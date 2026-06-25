@@ -75,6 +75,10 @@ class MarketplaceListingSerializer(serializers.ModelSerializer):
     def get_is_saved(self, obj):
         request = self.context.get('request')
         if request and request.user and request.user.is_authenticated:
+            # Optimize: check if user_saved prefetch exists to avoid N+1 database queries
+            if hasattr(obj, 'user_saved'):
+                return len(obj.user_saved) > 0
+            # Fallback if not prefetched
             from users.models import SavedProduct
             return SavedProduct.objects.filter(employee=request.user, marketplace_listing=obj).exists()
         return False

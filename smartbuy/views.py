@@ -63,7 +63,33 @@ class CampaignViewSet(viewsets.ModelViewSet):
         return [IsAdminEmployee()]
 
     def get_queryset(self):
-        queryset = super().get_queryset()
+        user = self.request.user
+        queryset = Campaign.objects.select_related('vendor')
+        
+        # Annotate confirmed buyers count to avoid N+1 count queries
+        from django.db.models import Count, Q, Prefetch
+        queryset = queryset.annotate(
+            annotated_confirmed_buyers_count=Count(
+                'registrations',
+                filter=Q(registrations__payment_status='approved')
+            )
+        )
+        
+        if user and user.is_authenticated:
+            # Prefetch only the current user's active registrations to avoid N+1 query loops
+            from smartbuy.models import CampaignRegistration
+            user_regs_queryset = CampaignRegistration.objects.filter(
+                employee=user
+            ).exclude(
+                payment_status__in=['cancelled', 'rejected']
+            )
+            queryset = queryset.prefetch_related(
+                'pricing_tiers',
+                Prefetch('registrations', queryset=user_regs_queryset, to_attr='user_active_registrations')
+            )
+        else:
+            queryset = queryset.prefetch_related('pricing_tiers')
+
         status_filter = self.request.query_params.get('status')
         if status_filter:
             queryset = queryset.filter(status=status_filter)

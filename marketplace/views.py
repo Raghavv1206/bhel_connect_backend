@@ -65,9 +65,18 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
         Regular users only see available/reserved (non-expired) and sold items.
         """
         user = self.request.user
-        queryset = MarketplaceListing.objects.select_related('seller', 'category', 'vehicle_details', 'property_details').prefetch_related('images')
+        queryset = MarketplaceListing.objects.select_related('seller', 'category', 'vehicle_details', 'property_details')
         
         if user.is_authenticated:
+            # Prefetch only the current user's saved products to avoid N+1 queries
+            from users.models import SavedProduct
+            from django.db.models import Prefetch
+            user_saved_queryset = SavedProduct.objects.filter(employee=user)
+            queryset = queryset.prefetch_related(
+                'images',
+                Prefetch('saved_by', queryset=user_saved_queryset, to_attr='user_saved')
+            )
+            
             if user.is_admin:
                 return queryset.order_by('-created_at')
             else:
@@ -80,6 +89,9 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
                     Q(status='sold') |
                     Q(seller=user)
                 ).order_by('-created_at')
+        else:
+            queryset = queryset.prefetch_related('images')
+            
         return queryset.none()
 
     def filter_queryset(self, queryset):
@@ -362,11 +374,13 @@ class ChatConversationsView(APIView):
                 
             other_user = msg.receiver if msg.sender == user else msg.sender
             
-            # Fetch cover photo url if available
+            # Fetch cover photo url if available in memory from prefetched list to avoid N+1 queries
             cover_image_url = None
-            if msg.listing.images.exists():
-                primary = msg.listing.images.filter(is_primary=True).first()
-                cover_image_url = primary.image.url if primary else msg.listing.images.first().image.url
+            listing_images = list(msg.listing.images.all())
+            if listing_images:
+                # Find primary image in memory
+                primary = next((img for img in listing_images if img.is_primary), None)
+                cover_image_url = primary.image.url if primary else listing_images[0].image.url
 
             conversations.append({
                 "id": msg.id,

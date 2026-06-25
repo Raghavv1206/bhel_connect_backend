@@ -209,6 +209,8 @@ class Campaign(models.Model):
     @property
     def confirmed_buyers_count(self):
         """Count of registrations with approved payment (confirmed buyers)."""
+        if hasattr(self, 'annotated_confirmed_buyers_count'):
+            return self.annotated_confirmed_buyers_count
         return self.registrations.filter(payment_status='approved').count()
 
     @property
@@ -235,19 +237,22 @@ class Campaign(models.Model):
             return cached_price
 
         confirmed = self.confirmed_buyers_count
-        # Find the matching tier for the current buyer count
-        matching_tier = self.pricing_tiers.filter(
-            min_buyers__lte=confirmed,
-        ).filter(
-            models.Q(max_buyers__gte=confirmed) | models.Q(max_buyers__isnull=True)
-        ).first()
+        
+        # Optimize: Iterate over prefetched pricing_tiers in memory to avoid N+1 query loops
+        tiers = list(self.pricing_tiers.all())
+        matching_tier = None
+        for tier in tiers:
+            if tier.min_buyers <= confirmed and (tier.max_buyers is None or tier.max_buyers >= confirmed):
+                matching_tier = tier
+                break
 
         if matching_tier:
             price = matching_tier.price
         else:
             # Fallback: if buyer count is below the first tier's minimum, use the first tier price
-            first_tier = self.pricing_tiers.order_by('min_buyers').first()
-            price = first_tier.price if first_tier else None
+            # Sort tiers in memory to avoid another query
+            sorted_tiers = sorted(tiers, key=lambda t: t.min_buyers)
+            price = sorted_tiers[0].price if sorted_tiers else None
 
         if price is not None:
             cache.set(cache_key, price, 30)  # 30-second TTL
