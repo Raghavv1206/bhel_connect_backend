@@ -55,28 +55,9 @@ def get_frontend_url():
 
 
 def send_order_initiated_email(registration):
-    """Sent when checkout begins (Cashfree order created)."""
-    frontend_url = get_frontend_url()
-    campaign = registration.campaign
-    employee = registration.employee
-
-    context = {
-        'user': employee,
-        'campaign': campaign,
-        'order_id': registration.cashfree_order_id,
-        'amount': registration.token_amount,
-        'date': registration.reservation_date or timezone.now(),
-        'campaign_link': f"{frontend_url}/smartbuy/{campaign.id}",
-        'subject': f"BHEL Connect - Registration Initiated for {campaign.title}"
-    }
-
-    send_smartbuy_email_async(
-        subject=context['subject'],
-        text_template='emails/order_initiated.txt',
-        html_template='emails/order_initiated.html',
-        context=context,
-        recipient_list=[employee.email]
-    )
+    """Disabled to conserve daily email limits. Logged only."""
+    logger.debug(f"Email skipped: order initiated for registration {registration.id}")
+    return
 
 
 def send_payment_confirmed_email(registration):
@@ -154,77 +135,21 @@ def send_payment_failed_email(registration):
 
 
 def send_waitlist_joined_email(registration):
-    """Sent when user joins the waitlist."""
-    frontend_url = get_frontend_url()
-    campaign = registration.campaign
-    employee = registration.employee
-
-    context = {
-        'user': employee,
-        'campaign': campaign,
-        'position': registration.waitlist_position,
-        'date': registration.reservation_date or timezone.now(),
-        'campaign_link': f"{frontend_url}/smartbuy/{campaign.id}",
-        'subject': f"BHEL Connect - Joined Waitlist for {campaign.title}"
-    }
-
-    send_smartbuy_email_async(
-        subject=context['subject'],
-        text_template='emails/waitlist_joined.txt',
-        html_template='emails/waitlist_joined.html',
-        context=context,
-        recipient_list=[employee.email]
-    )
+    """Disabled to conserve daily email limits. Logged only."""
+    logger.debug(f"Email skipped: waitlist joined for registration {registration.id}")
+    return
 
 
 def send_waitlist_promoted_email(registration):
-    """Sent when user is promoted from the waitlist (24-hour payment window starts)."""
-    frontend_url = get_frontend_url()
-    campaign = registration.campaign
-    employee = registration.employee
-
-    # Determine token amount from registration (falls back to campaign deposit)
-    token_amount = registration.token_amount or campaign.token_deposit
-
-    context = {
-        'user': employee,
-        'campaign': campaign,
-        'amount': token_amount,
-        'expiry_date': registration.slot_expiry_date,
-        'campaign_link': f"{frontend_url}/smartbuy/{campaign.id}",
-        'subject': f"BHEL Connect - Action Required: Waitlist Promotion for {campaign.title}"
-    }
-
-    send_smartbuy_email_async(
-        subject=context['subject'],
-        text_template='emails/waitlist_promoted.txt',
-        html_template='emails/waitlist_promoted.html',
-        context=context,
-        recipient_list=[employee.email]
-    )
+    """Disabled to conserve daily email limits. Logged only."""
+    logger.debug(f"Email skipped: waitlist promoted for registration {registration.id}")
+    return
 
 
 def send_slot_expired_email(registration):
-    """Sent when the 24-hour promotion window expires without payment."""
-    frontend_url = get_frontend_url()
-    campaign = registration.campaign
-    employee = registration.employee
-
-    context = {
-        'user': employee,
-        'campaign': campaign,
-        'date': timezone.now(),
-        'campaign_link': f"{frontend_url}/smartbuy/{campaign.id}",
-        'subject': f"BHEL Connect - Slot Reservation Expired for {campaign.title}"
-    }
-
-    send_smartbuy_email_async(
-        subject=context['subject'],
-        text_template='emails/slot_expired.txt',
-        html_template='emails/slot_expired.html',
-        context=context,
-        recipient_list=[employee.email]
-    )
+    """Disabled to conserve daily email limits. Logged only."""
+    logger.debug(f"Email skipped: slot expired for registration {registration.id}")
+    return
 
 
 def send_registration_cancelled_email(registration):
@@ -253,108 +178,18 @@ def send_registration_cancelled_email(registration):
 
 
 def send_campaign_closed_email(campaign, registrations):
-    """Bulk notifies all confirmed buyers that the campaign closed and final price is locked."""
-    frontend_url = get_frontend_url()
-    final_price = campaign.get_current_price()
-    confirmed_buyers_count = campaign.confirmed_buyers_count
-
-    for reg in registrations:
-        employee = reg.employee
-        token_amount = reg.token_amount
-        balance_due = final_price - token_amount
-
-        context = {
-            'user': employee,
-            'campaign': campaign,
-            'final_price': final_price,
-            'token_amount': token_amount,
-            'balance_due': balance_due,
-            'confirmed_buyers_count': confirmed_buyers_count,
-            'campaign_link': f"{frontend_url}/smartbuy/{campaign.id}",
-            'subject': f"BHEL Connect - Campaign '{campaign.title}' Closed Successfully"
-        }
-
-        send_smartbuy_email_async(
-            subject=context['subject'],
-            text_template='emails/campaign_closed.txt',
-            html_template='emails/campaign_closed.html',
-            context=context,
-            recipient_list=[employee.email]
-        )
+    """Disabled to conserve daily email limits. Logged only."""
+    logger.debug(f"Email skipped: campaign closed for campaign {campaign.id}")
+    return
 
 
 def send_campaign_cancelled_email(campaign, registrations):
-    """Notifies registered users (approved and pending) of campaign cancellation."""
-    frontend_url = get_frontend_url()
-
-    for reg in registrations:
-        employee = reg.employee
-        token_amount = reg.token_amount
-        reg_status = reg.payment_status
-
-        context = {
-            'user': employee,
-            'campaign': campaign,
-            'token_amount': token_amount,
-            'reg_status': reg_status,
-            'dashboard_link': f"{frontend_url}/smartbuy",
-            'subject': f"BHEL Connect - Campaign '{campaign.title}' Cancelled"
-        }
-
-        send_smartbuy_email_async(
-            subject=context['subject'],
-            text_template='emails/campaign_cancelled.txt',
-            html_template='emails/campaign_cancelled.html',
-            context=context,
-            recipient_list=[employee.email]
-        )
+    """Disabled to conserve daily email limits. Logged only."""
+    logger.debug(f"Email skipped: campaign cancelled for campaign {campaign.id}")
+    return
 
 
 def send_campaign_report_to_admin(campaign):
-    """Generates the campaign booking Excel sheet and emails it to the campaign's creator."""
-    if not campaign.created_by or not campaign.created_by.email:
-        logger.warning(f"Cannot send campaign close report: Campaign {campaign.id} has no creator or email.")
-        return
-
-    from reports.report_utils import generate_campaign_bookings_excel
-    
-    try:
-        # Generate the Excel byte string
-        excel_data = generate_campaign_bookings_excel(campaign)
-    except Exception as e:
-        logger.error(f"Failed to generate Excel report for campaign {campaign.id}: {e}", exc_info=True)
-        return
-
-    final_price = campaign.get_current_price()
-    confirmed_buyers_count = campaign.confirmed_buyers_count
-    waitlist_count = campaign.waitlisted_count
-    filename = f"campaign_{campaign.id}_bookings.xlsx"
-    frontend_url = get_frontend_url()
-
-    context = {
-        'admin_name': campaign.created_by.name,
-        'campaign': campaign,
-        'final_price': final_price,
-        'confirmed_buyers_count': confirmed_buyers_count,
-        'waitlist_count': waitlist_count,
-        'filename': filename,
-        'dashboard_link': f"{frontend_url}/admin/campaigns",
-        'subject': f"BHEL Connect - Campaign '{campaign.title}' Bookings Report Ready"
-    }
-
-    attachments = [
-        (
-            filename,
-            excel_data,
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-    ]
-
-    send_smartbuy_email_async(
-        subject=context['subject'],
-        text_template='emails/admin_campaign_report.txt',
-        html_template='emails/admin_campaign_report.html',
-        context=context,
-        recipient_list=[campaign.created_by.email],
-        attachments=attachments
-    )
+    """Disabled to conserve daily email limits. Logged only."""
+    logger.debug(f"Email skipped: campaign report for campaign {campaign.id}")
+    return

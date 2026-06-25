@@ -654,12 +654,8 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # 1 email for order initiated
-        self.assertEqual(len(mail.outbox), 1)
-        email = mail.outbox[0]
-        self.assertIn("Registration Initiated", email.subject)
-        self.assertEqual(email.to, [self.buyer.email])
-        self.assertIn("4500.00", email.body)  # 10% of 45000 (lowest pricing tier: 45000)
+        # 0 emails for order initiated (disabled to conserve daily email limits)
+        self.assertEqual(len(mail.outbox), 0)
 
     @patch('smartbuy.cashfree_service.CashfreeService.fetch_cashfree_order')
     @patch('cashfree_pg.api_client.Cashfree.PGOrderFetchPayments')
@@ -709,12 +705,8 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-        # Check email
-        self.assertEqual(len(mail.outbox), 1)
-        email = mail.outbox[0]
-        self.assertIn("Joined Waitlist", email.subject)
-        self.assertEqual(email.to, [self.buyer.email])
-        self.assertIn("Queue Position: #1", email.body)
+        # Check email (0 emails sent, disabled to conserve daily email limits)
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_cancellation_sends_email(self):
         reg = CampaignRegistration.objects.create(
@@ -755,12 +747,8 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
         from .utils import promote_from_waitlist
         promote_from_waitlist(self.campaign.id)
 
-        # Check email
-        self.assertEqual(len(mail.outbox), 1)
-        email = mail.outbox[0]
-        self.assertIn("Waitlist Promotion", email.subject)
-        self.assertEqual(email.to, [self.buyer.email])
-        self.assertIn("within 24 hours", email.body)
+        # Check email (0 emails sent, disabled to conserve daily email limits)
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_campaign_closed_sends_emails(self):
         # Register and approve buyer
@@ -778,22 +766,8 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check emails: 1 to buyer, 1 to admin
-        self.assertEqual(len(mail.outbox), 2)
-        
-        # Verify buyer email
-        buyer_email = next(e for e in mail.outbox if self.buyer.email in e.to)
-        self.assertIn("Closed Successfully", buyer_email.subject)
-        self.assertEqual(buyer_email.to, [self.buyer.email])
-        self.assertIn("50000.00", buyer_email.body) # final price
-
-        # Verify admin email
-        admin_email = next(e for e in mail.outbox if self.admin_user.email in e.to)
-        self.assertIn("Bookings Report Ready", admin_email.subject)
-        self.assertEqual(admin_email.to, [self.admin_user.email])
-        self.assertEqual(len(admin_email.attachments), 1)
-        self.assertEqual(admin_email.attachments[0][0], f"campaign_{self.campaign.id}_bookings.xlsx")
-        self.assertEqual(admin_email.attachments[0][2], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        # Check emails: 0 emails sent (disabled to conserve daily email limits)
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_campaign_cancelled_sends_emails(self):
         # Register and approve buyer
@@ -811,12 +785,8 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
         response = self.client.post(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-        # Check email
-        self.assertEqual(len(mail.outbox), 1)
-        email = mail.outbox[0]
-        self.assertIn("Cancelled", email.subject)
-        self.assertEqual(email.to, [self.buyer.email])
-        self.assertIn("full refund", email.body)
+        # Check email (0 emails sent, disabled to conserve daily email limits)
+        self.assertEqual(len(mail.outbox), 0)
 
     def test_cancel_registration_after_campaign_ended(self):
         """
