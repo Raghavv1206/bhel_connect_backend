@@ -62,7 +62,7 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
         """
         Restrict queries based on user privileges.
         Admins can view all listings. Owners can see their own listings of any status.
-        Regular users only see available/reserved/sold items.
+        Regular users only see available/reserved (non-expired) and sold items.
         """
         user = self.request.user
         queryset = MarketplaceListing.objects.select_related('seller', 'category', 'vehicle_details', 'property_details').prefetch_related('images')
@@ -72,8 +72,13 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
                 return queryset.order_by('-created_at')
             else:
                 from django.db.models import Q
+                from django.utils import timezone
+                now = timezone.now()
+                # Regular users see active (available/reserved) listings that haven't expired, plus sold ones, plus their own listings
                 return queryset.filter(
-                    Q(status__in=['available', 'reserved', 'sold']) | Q(seller=user)
+                    Q(status__in=['available', 'reserved'], expires_at__gt=now) |
+                    Q(status='sold') |
+                    Q(seller=user)
                 ).order_by('-created_at')
         return queryset.none()
 
@@ -101,13 +106,13 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         """
-        Overrides update to verify that the listing is not already sold,
+        Overrides update to verify that the listing is not already sold or expired,
         and reverts the status to 'pending' if updated by a non-admin owner.
         """
         instance = self.get_object()
-        if instance.status == 'sold':
+        if instance.status == 'sold' or instance.is_expired:
             return Response(
-                {"detail": "Cannot modify details of a listing that has already been marked as sold."}, 
+                {"detail": "Cannot modify details of a listing that has already been marked as sold or is expired."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -150,10 +155,10 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
             
-        # Security check: Prevent modifying sold listings
-        if listing.status == 'sold':
+        # Security check: Prevent modifying sold or expired listings
+        if listing.status == 'sold' or listing.is_expired:
             return Response(
-                {"detail": "Cannot modify status of a listing that has already been marked as sold."}, 
+                {"detail": "Cannot modify status of a listing that has already been marked as sold or is expired."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -192,6 +197,9 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         listing.status = 'available'
+        from django.utils import timezone
+        from datetime import timedelta
+        listing.expires_at = timezone.now() + timedelta(days=30)
         listing.save()
         self._broadcast_status_change(listing.id, 'available')
 

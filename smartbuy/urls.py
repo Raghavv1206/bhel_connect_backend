@@ -8,7 +8,8 @@ from .views import (
     SubmitPaymentView,
     CancelRegistrationView,
     CampaignRegistrationsListView,
-    CampaignWaitlistListView
+    CampaignWaitlistListView,
+    DownloadReceiptView
 )
 
 router = DefaultRouter()
@@ -24,6 +25,7 @@ urlpatterns = [
     path('campaigns/<int:id>/waitlist/', JoinWaitlistView.as_view(), name='campaign_waitlist'),
     path('campaigns/<int:id>/submit-payment/', SubmitPaymentView.as_view(), name='campaign_submit_payment'),
     path('campaigns/<int:id>/cancel-registration/', CancelRegistrationView.as_view(), name='campaign_cancel_registration'),
+    path('campaigns/<int:id>/receipt/', DownloadReceiptView.as_view(), name='campaign_download_receipt'),
     
     # Admin reporting lists
     path('campaigns/<int:id>/registrations/', CampaignRegistrationsListView.as_view(), name='campaign_registrations_list'),

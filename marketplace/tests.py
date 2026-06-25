@@ -480,3 +480,185 @@ class MarketplaceTestCase(APITestCase):
         results = response.data['results'] if isinstance(response.data, dict) and 'results' in response.data else response.data
         listing_ids = [item['id'] for item in results]
         self.assertNotIn(sold_listing.id, listing_ids)
+
+    def test_listing_expiration_model_and_approval_logic(self):
+        """
+        Verify expires_at is set on creation and resets on admin approval,
+        and is_expired property behaves correctly.
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # 1. Test creation sets expires_at to roughly 30 days
+        new_listing = MarketplaceListing.objects.create(
+            seller=self.seller,
+            title="Test Expiring Item",
+            description="Testing expiration.",
+            price=200.00,
+            condition="new",
+            category=self.electronics_cat,
+            status="pending"
+        )
+        self.assertIsNotNone(new_listing.expires_at)
+        time_diff = new_listing.expires_at - timezone.now()
+        self.assertTrue(timedelta(days=29) < time_diff < timedelta(days=31))
+        self.assertFalse(new_listing.is_expired)
+
+        # 2. Test admin approval resets expires_at
+        # Set expires_at back in time
+        old_time = timezone.now() - timedelta(days=10)
+        new_listing.expires_at = old_time
+        new_listing.save()
+
+        # Approve it
+        self.client.force_authenticate(user=self.admin)
+        approve_url = reverse('listing-approve-listing', kwargs={'pk': new_listing.id})
+        response = self.client.post(approve_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        new_listing.refresh_from_db()
+        self.assertEqual(new_listing.status, 'available')
+        time_diff = new_listing.expires_at - timezone.now()
+        self.assertTrue(timedelta(days=29) < time_diff < timedelta(days=31))
+        self.assertFalse(new_listing.is_expired)
+
+    def test_expired_listings_visibility_and_restrictions(self):
+        """
+        Verify that expired listings are filtered out for general buyers,
+        locked from updates, and block chat messages.
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+        from .consumers import save_chat_message
+
+        # 1. Create an expired listing (dynamic expiration: status available, expires_at in the past)
+        expired_listing = MarketplaceListing.objects.create(
+            seller=self.seller,
+            title="Expired Item",
+            description="No longer available.",
+            price=150.00,
+            condition="good",
+            category=self.electronics_cat,
+            status="available"
+        )
+        # Force expires_at to be in the past
+        MarketplaceListing.objects.filter(id=expired_listing.id).update(
+            expires_at=timezone.now() - timedelta(days=1)
+        )
+        expired_listing.refresh_from_db()
+        self.assertTrue(expired_listing.is_expired)
+
+        # 2. Buyer requests list feed - should NOT see the expired listing
+        self.client.force_authenticate(user=self.buyer)
+        url = reverse('listing-list')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results'] if isinstance(response.data, dict) and 'results' in response.data else response.data
+        listing_ids = [item['id'] for item in results]
+        self.assertNotIn(expired_listing.id, listing_ids)
+
+        # 3. Buyer queries status=available explicitly - should NOT see it
+        response = self.client.get(url, {'status': 'available'})
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results'] if isinstance(response.data, dict) and 'results' in response.data else response.data
+        listing_ids = [item['id'] for item in results]
+        self.assertNotIn(expired_listing.id, listing_ids)
+
+        # 4. Buyer attempts to retrieve details - should return 404
+        detail_url = reverse('listing-detail', kwargs={'pk': expired_listing.id})
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+        # 5. Seller requests feed - should see it (seller sees all their items)
+        self.client.force_authenticate(user=self.seller)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        results = response.data['results'] if isinstance(response.data, dict) and 'results' in response.data else response.data
+        listing_ids = [item['id'] for item in results]
+        self.assertIn(expired_listing.id, listing_ids)
+
+        # 6. Seller retrieves details - should succeed
+        response = self.client.get(detail_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        # 7. Seller attempts to edit the expired listing - should be blocked
+        response = self.client.put(detail_url, {
+            'title': 'Updated Expired Item',
+            'description': 'Attempting update.',
+            'price': 140.00,
+            'condition': 'good',
+            'category_id': self.electronics_cat.id
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot modify details of a listing that has already been marked as sold or is expired.", response.data['detail'])
+
+        # 8. Seller attempts to change status via status action - should be blocked
+        status_url = reverse('listing-update-status', kwargs={'pk': expired_listing.id})
+        response = self.client.patch(status_url, {'status': 'available'})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot modify status of a listing that has already been marked as sold or is expired.", response.data['detail'])
+
+        # 9. Verify WebSocket chat is blocked for expired listings
+        with self.assertRaises(ValueError):
+            save_chat_message.__wrapped__(
+                expired_listing.id,
+                self.buyer,
+                self.seller,
+                "Is it still available?"
+            )
+
+    def test_expire_old_listings_command(self):
+        """
+        Verify the expire_old_listings custom management command correctly
+        transitions expired listings to status='expired' and notifies the seller.
+        """
+        from django.core.management import call_command
+        from django.utils import timezone
+        from datetime import timedelta
+        from notifications.models import Notification
+
+        # Create a listing that expired
+        to_expire_listing = MarketplaceListing.objects.create(
+            seller=self.seller,
+            title="Soon to Expire",
+            description="Active but old.",
+            price=300.00,
+            condition="good",
+            category=self.electronics_cat,
+            status="available"
+        )
+        MarketplaceListing.objects.filter(id=to_expire_listing.id).update(
+            expires_at=timezone.now() - timedelta(days=1)
+        )
+
+        # Create a listing that is NOT expired
+        active_listing = MarketplaceListing.objects.create(
+            seller=self.seller,
+            title="Still Active",
+            description="Active and new.",
+            price=400.00,
+            condition="good",
+            category=self.electronics_cat,
+            status="available"
+        )
+
+        # Count notifications before
+        noti_count_before = Notification.objects.filter(recipient=self.seller).count()
+
+        # Run the command, executing deferred on_commit callbacks
+        with self.captureOnCommitCallbacks(execute=True):
+            call_command('expire_old_listings')
+
+        to_expire_listing.refresh_from_db()
+        active_listing.refresh_from_db()
+
+        # Check status updates
+        self.assertEqual(to_expire_listing.status, 'expired')
+        self.assertEqual(active_listing.status, 'available')
+
+        # Check notification was created
+        noti_count_after = Notification.objects.filter(recipient=self.seller).count()
+        self.assertEqual(noti_count_after, noti_count_before + 1)
+        latest_noti = Notification.objects.filter(recipient=self.seller).order_by('-created_at').first()
+        self.assertIn("expired", latest_noti.title.lower())
+        self.assertIn("Soon to Expire", latest_noti.message)

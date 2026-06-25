@@ -40,7 +40,7 @@ class ListingFilter(django_filters.FilterSet):
 
     def filter_status(self, queryset, name, value):
         """
-        Filters by status. Prevents regular users from querying pending, rejected, or sold listings 
+        Filters by status. Prevents regular users from querying pending, rejected, sold, or expired listings 
         unless they are the owner/seller.
         """
         request = self.request
@@ -53,19 +53,29 @@ class ListingFilter(django_filters.FilterSet):
         if user and user.is_authenticated and user.is_admin:
             return queryset.filter(status=value)
             
-        # Regular users: if they query pending/rejected/sold, only show theirs, else restrict to value
-        if value in ['pending', 'rejected', 'sold']:
+        # Regular users: if they query pending/rejected/sold/expired, only show theirs, else restrict to value
+        if value in ['pending', 'rejected', 'sold', 'expired']:
             if user and user.is_authenticated:
                 return queryset.filter(status=value, seller=user)
             return queryset.none()
             
+        # For 'available' and 'reserved', we must filter out expired ones for other users
+        if value in ['available', 'reserved']:
+            from django.utils import timezone
+            now = timezone.now()
+            if user and user.is_authenticated:
+                return queryset.filter(
+                    Q(status=value) & (Q(expires_at__gt=now) | Q(seller=user))
+                )
+            return queryset.filter(status=value, expires_at__gt=now)
+
         return queryset.filter(status=value)
 
     @property
     def qs(self):
         """
         Custom qs property to apply default status='available' filtering if no status parameter is provided,
-        and to ensure regular users do not see pending/rejected/sold listings of other users.
+        and to ensure regular users do not see pending/rejected/sold/expired listings of other users.
         """
         parent_qs = super().qs
         
@@ -77,11 +87,16 @@ class ListingFilter(django_filters.FilterSet):
         status_param = params.get('status')
         
         # Apply default status='available' if not explicitly provided
+        from django.utils import timezone
+        now = timezone.now()
         if not status_param:
             if user and user.is_authenticated:
-                # Everyone (including admins) sees available by default + their own items of any status (excluding sold)
-                parent_qs = parent_qs.filter(Q(status='available') | (Q(seller=user) & ~Q(status='sold')))
+                # Everyone (including admins) sees available by default (excluding expired) + their own items of any status (excluding sold)
+                parent_qs = parent_qs.filter(
+                    (Q(status='available') & Q(expires_at__gt=now)) | 
+                    (Q(seller=user) & ~Q(status='sold'))
+                )
             else:
-                parent_qs = parent_qs.filter(status='available')
+                parent_qs = parent_qs.filter(status='available', expires_at__gt=now)
                 
         return parent_qs

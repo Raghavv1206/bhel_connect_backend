@@ -817,3 +817,79 @@ class SmartBuyEmailNotificationTests(APITransactionTestCase):
         self.assertIn("Cancelled", email.subject)
         self.assertEqual(email.to, [self.buyer.email])
         self.assertIn("full refund", email.body)
+
+    def test_cancel_registration_after_campaign_ended(self):
+        """
+        Verify that cancelling a registration after the campaign is over is blocked.
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+
+        # Create approved registration
+        reg = CampaignRegistration.objects.create(
+            campaign=self.campaign,
+            employee=self.buyer,
+            token_amount=5000,
+            payment_status='approved',
+            is_waitlisted=False
+        )
+
+        # Make the campaign expired by setting start_date and duration_days in the past
+        self.campaign.start_date = timezone.now() - timedelta(days=10)
+        self.campaign.duration_days = 5
+        self.campaign.save()
+
+        # Try to cancel
+        self.client.force_authenticate(user=self.buyer)
+        url = reverse('campaign_cancel_registration', kwargs={'id': self.campaign.id})
+        response = self.client.post(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Cannot cancel registration after the campaign has ended.", response.data['detail'])
+
+    def test_download_receipt_success(self):
+        """
+        Verify that downloading a receipt for an approved reservation returns a PDF.
+        """
+        # Create approved registration
+        reg = CampaignRegistration.objects.create(
+            campaign=self.campaign,
+            employee=self.buyer,
+            token_amount=5000,
+            payment_status='approved',
+            is_waitlisted=False
+        )
+
+        # Download receipt
+        self.client.force_authenticate(user=self.buyer)
+        url = reverse('campaign_download_receipt', kwargs={'id': self.campaign.id})
+        response = self.client.get(url)
+        
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertTrue(response.content.startswith(b'%PDF'))
+
+    def test_download_receipt_failures(self):
+        """
+        Verify receipt download fails for pending registrations or unauthorized users.
+        """
+        # 1. Create a pending registration
+        reg = CampaignRegistration.objects.create(
+            campaign=self.campaign,
+            employee=self.buyer,
+            token_amount=5000,
+            payment_status='pending',
+            is_waitlisted=False
+        )
+
+        # Try to download
+        self.client.force_authenticate(user=self.buyer)
+        url = reverse('campaign_download_receipt', kwargs={'id': self.campaign.id})
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("Receipt is only available for confirmed and paid reservations.", response.data['detail'])
+
+        # 2. Try to download a campaign receipt where user is not registered at all
+        reg.delete()
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)

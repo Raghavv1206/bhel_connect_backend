@@ -63,11 +63,14 @@ def get_listing_and_validate_participants(listing_id, user, other_user_id):
 def save_chat_message(listing_id, sender, receiver, message_text):
     """
     Atomically saves a chat message to the database and generates a transaction-safe notification.
-    Ensures message cannot be sent for sold items.
+    Ensures message cannot be sent for sold or expired items.
     """
+    from django.utils import timezone
     listing = MarketplaceListing.objects.get(id=listing_id)
     if listing.status == 'sold':
         raise ValueError("This item has been sold by the owner. Chat is now closed.")
+    if listing.status == 'expired' or (listing.expires_at and listing.expires_at < timezone.now()):
+        raise ValueError("This listing has expired. Chat is now closed.")
 
     msg = ChatMessage.objects.create(
         listing=listing,

@@ -77,6 +77,7 @@ class MarketplaceListing(models.Model):
         ('reserved', 'Reserved'),          # Seller marked as reserved for a buyer
         ('sold', 'Sold'),                  # Transaction completed
         ('rejected', 'Rejected'),          # Admin rejected — not visible
+        ('expired', 'Expired'),            # Listing has expired after 1 month
     ]
 
     # Item condition choices
@@ -158,6 +159,12 @@ class MarketplaceListing(models.Model):
     # Record timestamps
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    expires_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='DateTime when the listing expires and becomes inactive'
+    )
 
     class Meta:
         ordering = ['-created_at']
@@ -176,6 +183,31 @@ class MarketplaceListing(models.Model):
 
     def __str__(self):
         return f"{self.title} — ₹{self.price} ({self.get_status_display()})"
+
+    def save(self, *args, **kwargs):
+        """
+        Override save to set default expires_at if not specified.
+        Defaults to 30 days from creation.
+        """
+        if not self.expires_at:
+            from django.utils import timezone
+            from datetime import timedelta
+            # Use created_at if already set, else now
+            base_time = self.created_at or timezone.now()
+            self.expires_at = base_time + timedelta(days=30)
+        super().save(*args, **kwargs)
+
+    @property
+    def is_expired(self):
+        """
+        True if the listing has expired dynamically or has an 'expired' status.
+        """
+        if self.status == 'expired':
+            return True
+        from django.utils import timezone
+        if self.status in ['available', 'reserved'] and self.expires_at and self.expires_at < timezone.now():
+            return True
+        return False
 
     def increment_views(self, user):
         """

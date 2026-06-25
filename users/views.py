@@ -49,6 +49,7 @@ class RequestOTPView(APIView):
     """
     permission_classes = []  # Public endpoint
 
+    @method_decorator(ratelimit(key='ip', rate='10/m', block=False))
     @method_decorator(ratelimit(key=employee_id_key, rate='5/h', block=False))
     def post(self, request):
         # Check if rate limit was exceeded
@@ -149,7 +150,18 @@ class VerifyOTPView(APIView):
     """
     permission_classes = []  # Public endpoint
 
+    @method_decorator(ratelimit(key='ip', rate='10/m', block=False))
+    @method_decorator(ratelimit(key=employee_id_key, rate='10/m', block=False))
     def post(self, request):
+        # Check if rate limit was exceeded
+        was_limited = getattr(request, 'limited', False)
+        if was_limited:
+            logger.warning(f"OTP verification rate-limited for key: {employee_id_key(None, request)}")
+            return Response(
+                {"detail": "Too many OTP verification attempts. Please wait and try again after some time."},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
+
         serializer = OTPVerifySerializer(data=request.data)
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -229,6 +241,7 @@ class LoginWithPasswordView(APIView):
     """
     permission_classes = []  # Public endpoint
 
+    @method_decorator(ratelimit(key='ip', rate='10/m', block=False))
     @method_decorator(ratelimit(key=employee_id_key, rate='5/h', block=False))
     def post(self, request):
         # Check if rate limit was exceeded

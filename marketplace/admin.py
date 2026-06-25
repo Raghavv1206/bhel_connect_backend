@@ -50,7 +50,7 @@ class MarketplaceListingAdmin(admin.ModelAdmin):
     Admin control for Marketplace Listings.
     Allows quick approval, rejection, and specifications viewing.
     """
-    list_display = ('title', 'seller', 'price', 'condition', 'category', 'status', 'views', 'created_at')
+    list_display = ('title', 'seller', 'price', 'condition', 'category', 'status', 'expires_at', 'views', 'created_at')
     list_filter = ('status', 'condition', 'category', 'created_at')
     search_fields = ('title', 'description', 'seller__employee_id', 'seller__name')
     inlines = [ListingImageInline, VehicleListingInline, PropertyListingInline]
@@ -58,7 +58,12 @@ class MarketplaceListingAdmin(admin.ModelAdmin):
     actions = ['approve_listings', 'reject_listings']
 
     def approve_listings(self, request, queryset):
-        queryset.update(status='available')
+        from django.utils import timezone
+        from datetime import timedelta
+        for listing in queryset:
+            listing.status = 'available'
+            listing.expires_at = timezone.now() + timedelta(days=30)
+            listing.save()
     approve_listings.short_description = "Approve selected listings (make available)"
 
     def reject_listings(self, request, queryset):
