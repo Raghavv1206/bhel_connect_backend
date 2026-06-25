@@ -62,7 +62,8 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
         """
         Restrict queries based on user privileges.
         Admins can view all listings. Owners can see their own listings of any status.
-        Regular users only see available/reserved (non-expired) and sold items.
+        Regular users only see available/reserved (non-expired) and sold items,
+        except when retrieving/updating their own listings.
         """
         user = self.request.user
         queryset = MarketplaceListing.objects.select_related('seller', 'category', 'vehicle_details', 'property_details')
@@ -83,12 +84,21 @@ class MarketplaceListingViewSet(viewsets.ModelViewSet):
                 from django.db.models import Q
                 from django.utils import timezone
                 now = timezone.now()
-                # Regular users see active (available/reserved) listings that haven't expired, plus sold ones, plus their own listings
-                return queryset.filter(
-                    Q(status__in=['available', 'reserved'], expires_at__gt=now) |
-                    Q(status='sold') |
-                    Q(seller=user)
-                ).order_by('-created_at')
+                
+                if self.action == 'list':
+                    # Main browse feed: only show approved/active or sold listings to everyone (including the seller).
+                    # Pending, rejected, or expired listings are not visible in the browse list.
+                    return queryset.filter(
+                        Q(status__in=['available', 'reserved'], expires_at__gt=now) |
+                        Q(status='sold')
+                    ).order_by('-created_at')
+                else:
+                    # Detail, update, or delete actions: owners can retrieve/manage their own listings in any state.
+                    return queryset.filter(
+                        Q(status__in=['available', 'reserved'], expires_at__gt=now) |
+                        Q(status='sold') |
+                        Q(seller=user)
+                    ).order_by('-created_at')
         else:
             queryset = queryset.prefetch_related('images')
             

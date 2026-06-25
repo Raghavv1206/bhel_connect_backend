@@ -114,20 +114,20 @@ class MarketplaceTestCase(APITestCase):
         self.assertIn(self.active_listing.id, listing_ids)
         self.assertNotIn(self.pending_listing.id, listing_ids)
 
-    def test_listing_list_includes_own_pending_listings(self):
+    def test_listing_list_excludes_own_pending_listings(self):
         """
-        Sellers should see their own listings of any status.
+        Sellers should NOT see their own pending listings in the main browse list.
         """
         self.client.force_authenticate(user=self.seller)
         url = reverse('listing-list')
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # Seller should see both the active listing and their own pending listing
+        # Seller should see the active listing but NOT their own pending listing
         results = response.data['results'] if isinstance(response.data, dict) and 'results' in response.data else response.data
         listing_ids = [item['id'] for item in results]
         self.assertIn(self.active_listing.id, listing_ids)
-        self.assertIn(self.pending_listing.id, listing_ids)
+        self.assertNotIn(self.pending_listing.id, listing_ids)
 
     def test_listing_detail_increments_views(self):
         """
@@ -569,13 +569,13 @@ class MarketplaceTestCase(APITestCase):
         response = self.client.get(detail_url)
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
-        # 5. Seller requests feed - should see it (seller sees all their items)
+        # 5. Seller requests feed - should NOT see their own expired listing in the main browse feed
         self.client.force_authenticate(user=self.seller)
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         results = response.data['results'] if isinstance(response.data, dict) and 'results' in response.data else response.data
         listing_ids = [item['id'] for item in results]
-        self.assertIn(expired_listing.id, listing_ids)
+        self.assertNotIn(expired_listing.id, listing_ids)
 
         # 6. Seller retrieves details - should succeed
         response = self.client.get(detail_url)
